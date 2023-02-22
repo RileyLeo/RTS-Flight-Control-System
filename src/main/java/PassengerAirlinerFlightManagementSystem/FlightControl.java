@@ -9,77 +9,60 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 class FlightControl implements Runnable {
-//    public static LinkedList<Integer> altitudeList = new LinkedList<>();
-//    Connection connection;
     Channel inputChannel;
     Channel outputChannel;
     String queueName;
-    String flightControlExchangeName = "FC";
-    public FlightControl(Connection connection) throws IOException {
+    boolean isMasksDeployed = false;
+        public FlightControl(Connection connection) throws IOException {
         inputChannel = connection.createChannel();
-        inputChannel.exchangeDeclare(flightControlExchangeName, "fanout");
+        inputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
         queueName = inputChannel.queueDeclare().getQueue();
-        inputChannel.queueBind(queueName, flightControlExchangeName, "");
+        inputChannel.queueBind(queueName, FCSMain.flightControlExchangeName, "");
 
         outputChannel = connection.createChannel();
     }
     @Override
     public void run() {
 
-        AtomicBoolean isMasksDeployed = new AtomicBoolean(false);
-
-        // basic exchange consume
         try {
 
-//            ConnectionFactory factory = new ConnectionFactory();
-//            Connection connection = factory.newConnection();
-//            Channel channel = connection.createChannel();
-//
-//            channel.exchangeDeclare(flightControlExchangeName, "fanout");
-//            String queueName = channel.queueDeclare().getQueue();
-//            channel.queueBind(queueName, flightControlExchangeName, "");
-//            String queueName = channel.queueDeclare().getQueue();
-
-            System.out.println("Flight Control is listening for messages");
+//            System.out.println("Flight Control is listening for messages");
             inputChannel.basicConsume(queueName, true, (consumerTag, delivery) -> {
                 String message = new String(delivery.getBody(), "UTF-8");
                 System.out.println("Flight Control received - " + message);
                 if (message.contains("CP:")) {
                     String[] parts = message.split(":");
                     int cabinPressure = Integer.parseInt(parts[1]);
-                    if (cabinPressure < 85 && !isMasksDeployed.get()) {
+                    if (cabinPressure < 80 && !isMasksDeployed) {
                         System.out.println("Cabin pressure is low, deploying masks");
                         // deploy oxygen mask
                         // send a message to oxygen mask to come down
-                        String oxygenMaskExchangeName = "OM";
-//                        Channel oxygenMaskChannel = connection.createChannel();
-                        outputChannel.exchangeDeclare(oxygenMaskExchangeName, "fanout");
+                        outputChannel.exchangeDeclare(FCSMain.oxygenMaskExchangeName, "fanout");
                         String oxygenMaskMessage = "Deploy Masks";
-                        outputChannel.basicPublish(oxygenMaskExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
+                        outputChannel.basicPublish(FCSMain.oxygenMaskExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
                         System.out.println("Flight Control sent: " + oxygenMaskMessage);
-//                        try {
-//                            outputChannel.close();
-//                        } catch (TimeoutException e) {
-//                            throw new RuntimeException(e);
-//                        }
+                    } else if (cabinPressure > 90 && isMasksDeployed) {
+                        System.out.println("Cabin pressure is high, retracting masks");
+                        // retract oxygen mask
+                        // send a message to oxygen mask to retract
+                        outputChannel.exchangeDeclare(FCSMain.oxygenMaskExchangeName, "fanout");
+                        String oxygenMaskMessage = "Retract Masks";
+                        outputChannel.basicPublish(FCSMain.oxygenMaskExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
+                        System.out.println("Flight Control sent: " + oxygenMaskMessage);
                     }
                 } else if (message.contains("OM:")){
                     // oxygen mask status
                     String[] parts = message.split(":");
                     String oxygenMaskStatus = parts[1];
                     if (oxygenMaskStatus.equals("Deployed")) {
-                        isMasksDeployed.set(true);
+                        isMasksDeployed = true;
+                        System.out.println("Oxygen masks deployed successfully");
                     } else if (oxygenMaskStatus.equals("Retracted")) {
-                        isMasksDeployed.set(false);
+                        isMasksDeployed = false;
+                        System.out.println("Oxygen masks retracted successfully");
                     }
                 }
 
-//                //close the channel
-//                try {
-//                    channel.close();
-//                } catch (TimeoutException e) {
-//                    throw new RuntimeException(e);
-//                }
             }, consumerTag -> {});
         } catch (Exception e) {
             e.printStackTrace();

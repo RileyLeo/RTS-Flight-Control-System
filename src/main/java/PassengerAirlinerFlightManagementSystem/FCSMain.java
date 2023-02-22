@@ -13,21 +13,21 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 public class FCSMain {
+
+    //Declare the every flight control system, Actuators, and Sensors exchange name
+    public static String flightControlExchangeName = "FC";
+    public static String oxygenMaskExchangeName = "OM";
+    public static String cabinPressureExchangeName = "CP";
+
     public static void main(String[] args) throws IOException, TimeoutException {
 
-//        String flightControlExchangeName = "FC";
         ConnectionFactory factory = new ConnectionFactory();
         Connection connection = factory.newConnection();
-//        Channel channel = connection.createChannel();
-//
-//        channel.exchangeDeclare(flightControlExchangeName, "fanout");
-//        String queueName = channel.queueDeclare().getQueue();
-//        channel.queueBind(queueName, flightControlExchangeName, "");
 
         ScheduledExecutorService timer = Executors.newScheduledThreadPool(1);
         timer.scheduleAtFixedRate(new FlightControl(connection), 0, 1000, TimeUnit.MILLISECONDS);
-        timer.scheduleAtFixedRate(new OxygenMasks(), 0, 1000, TimeUnit.MILLISECONDS);
-        timer.scheduleAtFixedRate(new CabinPressureSensor(), 0, 1000, TimeUnit.MILLISECONDS);
+        timer.scheduleAtFixedRate(new OxygenMasks(connection), 0, 1000, TimeUnit.MILLISECONDS);
+        timer.scheduleAtFixedRate(new CabinPressureSensor(connection), 0, 1000, TimeUnit.MILLISECONDS);
 
     }
 }
