@@ -49,7 +49,7 @@ public class CabinPressureSensor implements Runnable {
             if (CabinPressurePercentage < 100){
                 outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
 
-                String message = "CP:" + CabinPressurePercentage.toString();
+                String message = FCSMain.cabinPressureExchangeName  + ":" + CabinPressurePercentage.toString();
 
                 outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));
                 System.out.println("\u001B[31m" + "Cabin Pressure Sensor:"+ "\u001B[0m" + CabinPressurePercentage.toString() + " % cabin pressure sent to flight control");
