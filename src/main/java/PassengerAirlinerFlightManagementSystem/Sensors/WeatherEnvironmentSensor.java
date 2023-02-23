@@ -11,7 +11,6 @@ public class WeatherEnvironmentSensor implements Runnable{
     Channel inputChannel;
     Channel outputChannel;
     String queueName;
-    boolean isMaskDropped = false;
     public WeatherEnvironmentSensor(Connection connection) throws IOException {
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.weatherEnvironmentExchangeName, "fanout");
@@ -23,8 +22,35 @@ public class WeatherEnvironmentSensor implements Runnable{
 
     @Override
     public void run() {
-        // TODO Auto-generated method stub
+        //send the speed to the flight control system
+        try {
+            outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
 
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
+}
+
+class WeatherEnvironmentSensorInput implements Runnable {
+
+    WeatherEnvironmentSensor weatherEnvironmentSensor;
+
+    public WeatherEnvironmentSensorInput(WeatherEnvironmentSensor weatherEnvironmentSensor) {
+        this.weatherEnvironmentSensor = weatherEnvironmentSensor;
+    }
+    @Override
+    public void run() {
+        // retrieve updated wing flaps status from the flight control system
+        try {
+            weatherEnvironmentSensor.inputChannel.basicConsume(weatherEnvironmentSensor.queueName, true, (consumerTag, delivery) -> {
+
+            }, consumerTag -> {
+            });
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

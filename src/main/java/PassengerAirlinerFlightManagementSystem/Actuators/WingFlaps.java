@@ -19,6 +19,7 @@ public class WingFlaps implements Runnable{
         inputChannel.queueBind(queueName, FCSMain.wingFlapsExchangeName, "");
 
         outputChannel = connection.createChannel();
+        outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
     }
 
     @Override
@@ -31,7 +32,6 @@ public class WingFlaps implements Runnable{
                 if (message.equals("Adjust:Lower")) {
                     if(flapPosition != "low"){
                         System.out.println("\u001B[32m" + "Wing Flaps lowered" + "\u001B[0m");
-                        outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
                         String wingFlapsMessage = "WF:Wing flaps adjusted lower";
                         outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
                         flapPosition = "low";
@@ -42,7 +42,6 @@ public class WingFlaps implements Runnable{
                 } else if (message.equals("Adjust:Higher")) {
                     if (flapPosition != "high") {
                         System.out.println("\u001B[32m" + "Wing Flaps raised" + "\u001B[0m");
-                        outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
                         String wingFlapsMessage = "WF:Wing flaps adjusted higher";
                         outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
                         flapPosition = "high";
@@ -53,7 +52,6 @@ public class WingFlaps implements Runnable{
                 } else if (message.equals("Adjust:Normal")) {
                     if (flapPosition != "neutral") {
                         System.out.println("\u001B[32m" + "Wing Flaps are at neutral position" + "\u001B[0m");
-                        outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
                         String wingFlapsMessage = "WF:Wing flaps adjusted neutral position";
                         outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
                         flapPosition = "neutral";

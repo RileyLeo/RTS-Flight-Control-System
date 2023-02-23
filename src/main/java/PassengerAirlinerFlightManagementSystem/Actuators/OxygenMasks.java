@@ -22,6 +22,7 @@ public class OxygenMasks implements Runnable {
         inputChannel.queueBind(queueName, FCSMain.oxygenMaskExchangeName, "");
 
         outputChannel = connection.createChannel();
+        outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
     }
 
     @Override
@@ -34,7 +35,6 @@ public class OxygenMasks implements Runnable {
                 if (message.equals("Deploy Masks")) {
                     if (!isMaskDropped) {
                         System.out.println("\u001B[36m" +"Oxygen Masks deployed" + "\u001B[0m");
-                        outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
                         String oxygenMaskMessage = "OM:Deployed";
                         outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
                         System.out.println("\u001B[36m" + "Oxygen Masks sent: " + oxygenMaskMessage +"\u001B[0m");
@@ -46,7 +46,6 @@ public class OxygenMasks implements Runnable {
                     if (isMaskDropped) {
                         System.out.println("\u001B[36m" + "Oxygen Masks have been retracted" + "\u001B[0m");
                         isMaskDropped = false;
-                        outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
                         String oxygenMaskMessage = "OM:Retracted";
                         outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
                         System.out.println("\u001B[36m" + "Oxygen Masks sent: " + oxygenMaskMessage + "\u001B[0m");

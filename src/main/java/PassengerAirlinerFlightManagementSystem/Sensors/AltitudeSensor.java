@@ -9,7 +9,6 @@ import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 public class AltitudeSensor implements Runnable {
 
@@ -25,6 +24,7 @@ public class AltitudeSensor implements Runnable {
         inputChannel.queueBind(queueName, FCSMain.altitudeExchangeName, "");
 
         outputChannel = connection.createChannel();
+        outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
     }
     Random rand = new Random();
     Integer CurrentAltitude = 34500;
@@ -32,7 +32,6 @@ public class AltitudeSensor implements Runnable {
 
     @Override
     public void run() {
-//        System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + "Wing Flaps are in " + flapPosition + " position");
 
         timer.scheduleAtFixedRate(new AltitudeSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
         // adjust the altitude randomly
@@ -48,7 +47,6 @@ public class AltitudeSensor implements Runnable {
 
         // send the altitude to the flight control system
         try {
-            outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
             String message = FCSMain.altitudeExchangeName + ":" + CurrentAltitude.toString();
 
             outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));
@@ -70,8 +68,6 @@ class AltitudeSensorInput implements Runnable {
 
     @Override
     public void run() {
-//        altitudeSensor.flapPosition = "neutral";
-
         // retrieve updated wing flaps status from the flight control system
         try {
             altitudeSensor.inputChannel.basicConsume(altitudeSensor.queueName, true, (consumerTag, delivery) -> {

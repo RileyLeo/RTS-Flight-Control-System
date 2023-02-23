@@ -23,6 +23,7 @@ public class CabinPressureSensor implements Runnable {
         inputChannel.queueBind(queueName, FCSMain.cabinPressureExchangeName, "");
 
         outputChannel = connection.createChannel();
+        outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
     }
 
 
@@ -47,8 +48,6 @@ public class CabinPressureSensor implements Runnable {
 
         try {
             if (CabinPressurePercentage < 100){
-                outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
-
                 String message = FCSMain.cabinPressureExchangeName  + ":" + CabinPressurePercentage.toString();
 
                 outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));

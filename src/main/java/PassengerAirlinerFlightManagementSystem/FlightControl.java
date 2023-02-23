@@ -29,8 +29,13 @@ class FlightControl implements Runnable {
     int upperboundAltitudeDuringFlight = 38000;
     int middleboundAltitudeDuringFlight = 34500;
     int lowerboundAltitudeDuringFlight = 31000;
-    int middleboundThreshold = 2000; //34500 +- 2000 = (32500 to 36500)
+    int middleboundAltitudeThreshold = 2000; //34500 +- 2000 = (32500 to 36500)
     String flapPosition = "neutral";
+    int upperboundSpeedDuringFlight = 1000;
+    int middleboundSpeedDuringFlight = 900;
+    int lowerboundSpeedDuringFlight = 800;
+    int middleboundSpeedThreshold = 50; //900 +- 50 = (850 to 950)
+    String engineMode = "Moderate";
 
 
     @Override
@@ -92,7 +97,7 @@ class FlightControl implements Runnable {
                         outputChannel.exchangeDeclare(FCSMain.wingFlapsExchangeName, "fanout");
                         String wingFlapsMessage = "Adjust:Higher";
                         outputChannel.basicPublish(FCSMain.wingFlapsExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
-                    } else if (altitude >= middleboundAltitudeDuringFlight - middleboundThreshold && altitude <= middleboundAltitudeDuringFlight + middleboundThreshold && !isLanding && !flapPosition.equals("neutral")){
+                    } else if (altitude >= middleboundAltitudeDuringFlight - middleboundAltitudeThreshold && altitude <= middleboundAltitudeDuringFlight + middleboundAltitudeThreshold && !isLanding && !flapPosition.equals("neutral")){
                         System.out.println("Altitude is in the middle, adjusting wing flaps to a middle angle");
                         // adjust wing flaps to a normal angle
                         // send a message to wing flaps to adjust
@@ -118,14 +123,56 @@ class FlightControl implements Runnable {
                     outputChannel.exchangeDeclare(FCSMain.altitudeExchangeName, "fanout");
                     String altitudeControlMessage = wingFlapsStatus;
                     outputChannel.basicPublish(FCSMain.altitudeExchangeName, "", null, altitudeControlMessage.getBytes("UTF-8"));
+                } else if (message.contains("SP:")){
+                    //Speed Status
+                    String[] parts = message.split(":");
+                    int speed = Integer.parseInt(parts[1]);
+                    if(speed > upperboundSpeedDuringFlight && !isLanding && !engineMode.equals("Decelerated")){
+                        System.out.println("Speed is high, decelerate engine to slow down");
+                        // decelerate engine to slow down
+                        // send a message to engine to decelerate
+                        outputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
+                        String engineMessage = "Decelerate";
+                        outputChannel.basicPublish(FCSMain.engineExchangeName, "", null, engineMessage.getBytes("UTF-8"));
+                    } else if(speed < lowerboundSpeedDuringFlight && !isLanding && !engineMode.equals("Accelerated")){
+                        System.out.println("Speed is low, accelerate engine to speed up");
+                        // accelerate engine to speed up
+                        // send a message to engine to accelerate
+                        outputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
+                        String engineMessage = "Accelerate";
+                        outputChannel.basicPublish(FCSMain.engineExchangeName, "", null, engineMessage.getBytes("UTF-8"));
+                    } else if (speed >= middleboundSpeedDuringFlight - middleboundSpeedThreshold && speed <= middleboundSpeedDuringFlight + middleboundSpeedThreshold && !isLanding && !engineMode.equals("Moderate")){
+                        System.out.println("Normal Speed, putting engine to moderate speed");
+                        // maintain engine speed
+                        // send a message to engine to maintain speed
+                        outputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
+                        String engineMessage = "Moderate";
+                        outputChannel.basicPublish(FCSMain.engineExchangeName, "", null, engineMessage.getBytes("UTF-8"));
+                    }
+                } else if (message.contains("EN:")){
+                    // Engine Status
+                    String[] parts = message.split(":");
+                    String engineStatus = parts[1];
+                    if (engineStatus.equals("Engine decelerated")) {
+                        System.out.println("Engine decelerated successfully");
+                        engineMode = "Decelerated";
+                    } else if (engineStatus.equals("Engine accelerated")) {
+                        System.out.println("Engine accelerated successfully");
+                        engineMode = "Accelerated";
+                    } else if (engineStatus.equals("Engine moderated")) {
+                        System.out.println("Engine speed maintained successfully");
+                        engineMode = "Moderate";
+                    }
+                    //Inform Speed sensor of the adjustment
+                    outputChannel.exchangeDeclare(FCSMain.speedExchangeName, "fanout");
+                    String speedControlMessage = engineStatus;
+                    outputChannel.basicPublish(FCSMain.speedExchangeName, "", null, speedControlMessage.getBytes("UTF-8"));
                 }
             }, consumerTag -> {
             });
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-
     }
 
     public void landingSequence() {
