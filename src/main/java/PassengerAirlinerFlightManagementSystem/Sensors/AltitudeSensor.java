@@ -6,6 +6,9 @@ import com.rabbitmq.client.Connection;
 
 import java.io.IOException;
 import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 public class AltitudeSensor implements Runnable {
@@ -13,7 +16,9 @@ public class AltitudeSensor implements Runnable {
     Channel inputChannel;
     Channel outputChannel;
     String queueName;
+    ScheduledExecutorService timer;
     public AltitudeSensor(Connection connection) throws IOException {
+        timer = Executors.newScheduledThreadPool(1);
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.altitudeExchangeName, "fanout");
         queueName = inputChannel.queueDeclare().getQueue();
@@ -23,22 +28,23 @@ public class AltitudeSensor implements Runnable {
     }
     Random rand = new Random();
     Integer CurrentAltitude = 34500;
-    String flapPosition;
+    Integer flapModifier = 0;
 
     @Override
     public void run() {
+//        System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + "Wing Flaps are in " + flapPosition + " position");
 
-        // adjust the altitude
+        timer.scheduleAtFixedRate(new AltitudeSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
+        // adjust the altitude randomly
         int change = rand.nextInt(5);
         if (rand.nextBoolean()) {
             change *= -1;
         }
-        //modifier code here
-
 
         //final equation
-        CurrentAltitude += change*500;
-
+        //change max/min= +- 2500
+        // modifier max/min = +-1000
+        CurrentAltitude = CurrentAltitude + (change * 500) + (flapModifier * 1500);
 
         // send the altitude to the flight control system
         try {
@@ -50,23 +56,15 @@ public class AltitudeSensor implements Runnable {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
-
-
-
     }
 
 }
 
 class AltitudeSensorInput implements Runnable {
 
-    Channel inputChannel;
-    String queueName;
     AltitudeSensor altitudeSensor;
 
-    public AltitudeSensorInput(Channel inputChannel, String queueName, AltitudeSensor altitudeSensor) {
-        this.inputChannel = inputChannel;
-        this.queueName = queueName;
+    public AltitudeSensorInput(AltitudeSensor altitudeSensor) {
         this.altitudeSensor = altitudeSensor;
     }
 
@@ -76,31 +74,19 @@ class AltitudeSensorInput implements Runnable {
 
         // retrieve updated wing flaps status from the flight control system
         try {
-            inputChannel.basicConsume(queueName, true, (consumerTag, delivery) -> {
+            altitudeSensor.inputChannel.basicConsume(altitudeSensor.queueName, true, (consumerTag, delivery) -> {
                 String message = new String(delivery.getBody(), "UTF-8");
-                System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + " received - " + message);
-//                if (message.contains("Wing Flaps:")) {
-//                    //Wing Flaps
-//                    String[] parts = message.split(":");
-//                    String wingFlaps = parts[1];
-//                    if (wingFlaps.equals("up")) {
-//                        System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + " received - " + message);
-//                        // deploy oxygen mask
-//                        // send a message to oxygen mask to come down
-//                        outputChannel.exchangeDeclare(FCSMain.oxygenMaskExchangeName, "fanout");
-//                        String oxygenMaskMessage = "Deploy Masks";
-//                        outputChannel.basicPublish(FCSMain.oxygenMaskExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
-//                        System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + " sent: " + oxygenMaskMessage);
-//                    } else if (wingFlaps.equals("down")) {
-//                        System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + " received - " + message);
-//                        // retract oxygen mask
-//                        // send a message to oxygen mask to retract
-//                        outputChannel.exchangeDeclare(FCSMain.oxygenMaskExchangeName, "fanout");
-//                        String oxygenMaskMessage = "Retract Masks";
-//                        outputChannel.basicPublish(FCSMain.oxygenMaskExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
-//                        System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + " sent: " + oxygenMaskMessage);
-//                    }
-//                }
+                System.out.println("\u001B[33m" + "Altitude Sensor:" + "\u001B[0m" + " received - " + message);
+                if (message.equals("Wing flaps adjusted lower")) {
+                    System.out.println("Wing flaps adjusted lower successfully");
+                    altitudeSensor.flapModifier = -1;
+                } else if (message.equals("Wing flaps adjusted higher")) {
+                    System.out.println("Wing flaps adjusted higher successfully");
+                    altitudeSensor.flapModifier = 1;
+                } else if (message.equals("Wing flaps adjusted neutral position")) {
+                    System.out.println("Wing flaps adjusted to normal successfully");
+                    altitudeSensor.flapModifier = 0;
+                }
             }, consumerTag -> {
             });
         } catch (IOException e) {
@@ -108,3 +94,4 @@ class AltitudeSensorInput implements Runnable {
         }
     }
 }
+

@@ -4,7 +4,6 @@ import PassengerAirlinerFlightManagementSystem.Actuators.OxygenMasks;
 import PassengerAirlinerFlightManagementSystem.Actuators.WingFlaps;
 import PassengerAirlinerFlightManagementSystem.Sensors.AltitudeSensor;
 import PassengerAirlinerFlightManagementSystem.Sensors.CabinPressureSensor;
-import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 
