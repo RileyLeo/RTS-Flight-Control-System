@@ -5,6 +5,7 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -36,6 +37,7 @@ class FlightControl implements Runnable {
     int lowerboundSpeedDuringFlight = 800;
     int middleboundSpeedThreshold = 50; //900 +- 50 = (850 to 950)
     String engineMode = "Moderate";
+    String currentWeather;
 
 
     @Override
@@ -46,7 +48,7 @@ class FlightControl implements Runnable {
 //            System.out.println("Flight Control is listening for messages");
             inputChannel.basicConsume(queueName, true, (consumerTag, delivery) -> {
                 String message = new String(delivery.getBody(), "UTF-8");
-                System.out.println("Flight Control received - " + message);
+//                System.out.println("Flight Control received - " + message);
                 if (message.contains("CP:")) {
                     //Cabin Pressure
                     String[] parts = message.split(":");
@@ -167,7 +169,25 @@ class FlightControl implements Runnable {
                     outputChannel.exchangeDeclare(FCSMain.speedExchangeName, "fanout");
                     String speedControlMessage = engineStatus;
                     outputChannel.basicPublish(FCSMain.speedExchangeName, "", null, speedControlMessage.getBytes("UTF-8"));
+                } else if (message.contains("WE:")){
+                    String[] parts = message.split(":");
+                    String weatherStatus = parts[1];
+                    if (weatherStatus.equals("Clear")) {
+                        System.out.println("Weather is clear, no need to adjust");
+                        currentWeather = "Clear";
+                    } else if (weatherStatus.equals("Rain")) {
+                        System.out.println("Weather is rainy, watch up for potential thunderstorm!");
+                        currentWeather = "Rain";
+                    } else if (weatherStatus.equals("Thunderstorm")) {
+                        System.out.println("There is a thunderstorm, turbulence is expected!");
+                        currentWeather = "Thunderstorm";
+                        System.out.println("Activating turbulence countermeasures");
+                        // activate turbulence countermeasures
+                        turbulenceSequence();
+                    }
                 }
+
+
             }, consumerTag -> {
             });
         } catch (Exception e) {
@@ -176,9 +196,79 @@ class FlightControl implements Runnable {
     }
 
     public void landingSequence() {
-
+//try {
+//            // send a message to wing flaps to adjust
+//            outputChannel.exchangeDeclare(FCSMain.wingFlapsExchangeName, "fanout");
+//            String wingFlapsMessage = "Adjust:Lower";
+//            outputChannel.basicPublish(FCSMain.wingFlapsExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
+//            // send a message to engine to decelerate
+//            outputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
+//            String engineMessage = "Decelerate";
+//            outputChannel.basicPublish(FCSMain.engineExchangeName, "", null, engineMessage.getBytes("UTF-8"));
+//            // send a message to landing gear to deploy
+//            outputChannel.exchangeDeclare(FCSMain.landingGearExchangeName, "fanout");
+//            String landingGearMessage = "Deploy";
+//            outputChannel.basicPublish(FCSMain.landingGearExchangeName, "", null, landingGearMessage.getBytes("UTF-8"));
+//            // send a message to air brakes to deploy
+//            outputChannel.exchangeDeclare(FCSMain.airBrakesExchangeName, "fanout");
+//            String airBrakesMessage = "Deploy";
+//            outputChannel.basicPublish(FCSMain.airBrakesExchangeName, "", null, airBrakesMessage.getBytes("UTF-8"));
+//            // send a message to landing gear to deploy
+//            outputChannel.exchangeDeclare(FCSMain.landingGearExchangeName, "fanout");
+//            String landingGearMessage2 = "Deploy";
+//            outputChannel.basicPublish(FCSMain.landingGearExchangeName, "", null, landingGearMessage2.getBytes("UTF-8"));
+//            // send a message to air brakes to deploy
+//            outputChannel.exchangeDeclare(FCSMain.airBrakesExchangeName, "fanout");
+//            String airBrakesMessage2 = "Deploy";
+//            outputChannel.basicPublish(FCSMain.airBrakesExchangeName, "", null, airBrakesMessage2.getBytes("UTF-8"));
+//            // send a message to landing gear to deploy
+//            outputChannel.exchangeDeclare(FCSMain.landingGearExchangeName, "fanout");
+//            String landingGearMessage3 = "Deploy";
+//            outputChannel.basicPublish(FCSMain.landingGearExchangeName, "", null, landingGearMessage3.getBytes("UTF-8"));
+//            // send a message to air brakes to deploy
+//            outputChannel.exchangeDeclare(FCSMain.airBrakesExchangeName, "fanout");
+//            String airBrakes
 
     }
 
+
+        public void turbulenceSequence() {
+            try {
+                //turbulence countermeasures
+                // send a message to wing flaps to adjust
+                outputChannel.exchangeDeclare(FCSMain.wingFlapsExchangeName, "fanout");
+                String wingFlapsMessage = "Adjust:Lower";
+                outputChannel.basicPublish(FCSMain.wingFlapsExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
+                // send a message to altitude sensor to adjust
+                outputChannel.exchangeDeclare(FCSMain.altitudeExchangeName, "fanout");
+                String altitudeMessage = "Wing flaps adjusted lower";
+                outputChannel.basicPublish(FCSMain.altitudeExchangeName, "", null, altitudeMessage.getBytes("UTF-8"));
+
+                // send a message to engine to decelerate
+                outputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
+                String engineMessage = "Decelerate";
+                outputChannel.basicPublish(FCSMain.engineExchangeName, "", null, engineMessage.getBytes("UTF-8"));
+                // send a message to speed sensor to adjust
+                outputChannel.exchangeDeclare(FCSMain.speedExchangeName, "fanout");
+                String engineStatus = "Engine decelerated";
+                outputChannel.basicPublish(FCSMain.speedExchangeName, "", null, engineStatus.getBytes("UTF-8"));
+
+                // sleep for 5 seconds
+                Thread.sleep(5000);
+
+                //turbulence solved
+                // send a message to Weather Environment sensor to inform
+                outputChannel.exchangeDeclare(FCSMain.weatherEnvironmentExchangeName, "fanout");
+                String weatherMessage = "Turbulence resolved";
+                outputChannel.basicPublish(FCSMain.weatherEnvironmentExchangeName, "", null, weatherMessage.getBytes("UTF-8"));
+
+            } catch (UnsupportedEncodingException e) {
+                throw new RuntimeException(e);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+    }
 
 }
