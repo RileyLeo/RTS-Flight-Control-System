@@ -30,6 +30,7 @@ public class WeatherEnvironmentSensor implements Runnable{
     String currentWeather = "Clear";
     String reportedWeather = "Clear";
     boolean hasResolvedTurbulence;
+    boolean isLanding = false;
     @Override
     public void run() {
         //randomly resolve turbulence when thunderstorm (testing purposes)
@@ -57,7 +58,7 @@ public class WeatherEnvironmentSensor implements Runnable{
                 }
 
                 //weather report
-                if (firstRun || currentWeather != reportedWeather) {
+                if ((firstRun || currentWeather != reportedWeather) && !isLanding) {
                     String message = FCSMain.weatherEnvironmentExchangeName + ":" + currentWeather;
                     outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));
                     System.out.println("\u001B[38;2;255;165;0m" + "Weather Environment Sensor:"+ "\u001B[0m" + currentWeather + " weather sent to flight control");
@@ -97,6 +98,11 @@ class WeatherEnvironmentSensorInput implements Runnable {
                 if (message.equals("Turbulence resolved")) {
                     weatherEnvironmentSensor.hasResolvedTurbulence = true;
                     System.out.println("\u001B[38;2;255;165;0m" + "Weather Environment Sensor:"+ "\u001B[0m" + "Turbulence resolved");
+                } else if (message.equals("Landing")){
+                    weatherEnvironmentSensor.currentWeather = "Clear";
+                    weatherEnvironmentSensor.hasResolvedTurbulence = true;
+                    System.out.println("\u001B[38;2;255;165;0m" + "Weather Environment Sensor:"+ "\u001B[0m" + "Landing, weather is now clear, stopping message sending");
+                    weatherEnvironmentSensor.isLanding = true;
                 }
             }, consumerTag -> {
             });

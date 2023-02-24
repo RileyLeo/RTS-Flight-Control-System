@@ -29,6 +29,9 @@ public class AltitudeSensor implements Runnable {
     Random rand = new Random();
     Integer CurrentAltitude = 34500;
     Integer flapModifier = 0;
+    boolean landingMode = false;
+//    boolean isAltitudeZero = false;
+    boolean isMessageAcknowledged = false;
 
     @Override
     public void run() {
@@ -36,21 +39,29 @@ public class AltitudeSensor implements Runnable {
         timer.scheduleAtFixedRate(new AltitudeSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
         // adjust the altitude randomly
         int change = rand.nextInt(5);
-        if (rand.nextBoolean()) {
-            change *= -1;
+        if (landingMode == false) {
+            if (rand.nextBoolean()) {
+                change *= -1;
+            }
+        } else {
+            change = 0;
         }
 
         //final equation
         //change max/min= +- 2500
         // modifier max/min = +-1000
         CurrentAltitude = CurrentAltitude + (change * 500) + (flapModifier * 1500);
+        if (CurrentAltitude < 0) {
+            CurrentAltitude = 0;
+        }
 
         // send the altitude to the flight control system
         try {
-            String message = FCSMain.altitudeExchangeName + ":" + CurrentAltitude.toString();
-
-            outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));
-            System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + CurrentAltitude.toString() + " ft altitude sent to flight control");
+            if (!isMessageAcknowledged) {
+                String message = FCSMain.altitudeExchangeName + ":" + CurrentAltitude.toString();
+                outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));
+                System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + CurrentAltitude.toString() + " ft altitude sent to flight control");
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -74,14 +85,21 @@ class AltitudeSensorInput implements Runnable {
                 String message = new String(delivery.getBody(), "UTF-8");
                 System.out.println("\u001B[33m" + "Altitude Sensor:" + "\u001B[0m" + " received - " + message);
                 if (message.equals("Wing flaps adjusted lower")) {
-                    System.out.println("Wing flaps adjusted lower successfully");
+                    System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + "Wing flaps adjusted lower successfully");
                     altitudeSensor.flapModifier = -1;
                 } else if (message.equals("Wing flaps adjusted higher")) {
-                    System.out.println("Wing flaps adjusted higher successfully");
+                    System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + "Wing flaps adjusted higher successfully");
                     altitudeSensor.flapModifier = 1;
                 } else if (message.equals("Wing flaps adjusted neutral position")) {
-                    System.out.println("Wing flaps adjusted to normal successfully");
+                    System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + "Wing flaps adjusted neutral position successfully");
                     altitudeSensor.flapModifier = 0;
+                } else if (message.equals("Landing mode activate, Wing flaps adjusted lower")) {
+                    System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + "Landing mode activate, Wing flaps adjusted lower successfully");
+                    altitudeSensor.landingMode = true;
+                    altitudeSensor.flapModifier = -2;
+                }else if (message.equals("Message Acknowledged")) {
+                    altitudeSensor.isMessageAcknowledged = true;
+                    System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + "Message acknowledged, sending stopped");
                 }
             }, consumerTag -> {
             });

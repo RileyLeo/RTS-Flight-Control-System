@@ -7,6 +7,9 @@ import com.rabbitmq.client.Channel;
 
 import java.io.IOException;
 import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class CabinPressureSensor implements Runnable {
 
@@ -15,8 +18,10 @@ public class CabinPressureSensor implements Runnable {
     String queueName;
     Random rand = new Random();
     Boolean isDropping = true;
+    ScheduledExecutorService timer;
 
     public CabinPressureSensor(Connection connection) throws IOException {
+        timer = Executors.newScheduledThreadPool(1);
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.cabinPressureExchangeName, "fanout");
         queueName = inputChannel.queueDeclare().getQueue();
@@ -28,9 +33,12 @@ public class CabinPressureSensor implements Runnable {
 
 
     public Integer CabinPressurePercentage = 100;
+    boolean isLanding = false;
+    boolean oneMore = true;
 
     @Override
     public void run() {
+        timer.scheduleAtFixedRate(new CabinPressureSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
         // adjust the cabin pressure
         int percentageDrop = rand.nextInt(5);
 
@@ -38,21 +46,27 @@ public class CabinPressureSensor implements Runnable {
             CabinPressurePercentage -= percentageDrop;
         } else if (CabinPressurePercentage < 100) {
             CabinPressurePercentage += percentageDrop;
+            if (CabinPressurePercentage > 100) {
+                CabinPressurePercentage = 100;
+            }
         }
 
         //Initialize cabin pressure restoration if cabin pressure is below 40%
-        if (CabinPressurePercentage <= 40) {
-            System.out.println("\u001B[31m" + "Cabin Pressure Sensor:"+ "\u001B[0m" + "Cabin pressure system is fixed, restoring cabin pressure");
+        if (CabinPressurePercentage <= 40 && isLanding == false) {
+            System.out.println("\u001B[31m" + "Cabin Pressure Sensor:" + "\u001B[0m" + "Cabin pressure system is fixed, restoring cabin pressure");
             isDropping = false;
         }
 
         try {
-            if (CabinPressurePercentage < 100){
-                String message = FCSMain.cabinPressureExchangeName  + ":" + CabinPressurePercentage.toString();
+            if ((CabinPressurePercentage < 100 && isLanding == false) || oneMore == true) {
+                String message = FCSMain.cabinPressureExchangeName + ":" + CabinPressurePercentage.toString();
 
                 outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));
-                System.out.println("\u001B[31m" + "Cabin Pressure Sensor:"+ "\u001B[0m" + CabinPressurePercentage.toString() + " % cabin pressure sent to flight control");
-
+                System.out.println("\u001B[31m" + "Cabin Pressure Sensor:" + "\u001B[0m" + CabinPressurePercentage.toString() + " % cabin pressure sent to flight control");
+                if (CabinPressurePercentage == 100) {
+                    oneMore = false;
+                    System.out.println("\u001B[31m" + "Cabin Pressure Sensor:" + "\u001B[0m" + "Cabin pressure restored to 100%, stop sending messages");
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -61,4 +75,30 @@ public class CabinPressureSensor implements Runnable {
 
     }
 
+}
+
+class CabinPressureSensorInput implements Runnable {
+
+    CabinPressureSensor cabinPressureSensor;
+
+    public CabinPressureSensorInput(CabinPressureSensor cabinPressureSensor) {
+        this.cabinPressureSensor = cabinPressureSensor;
+    }
+
+    @Override
+    public void run() {
+        // retrieve updated wing flaps status from the flight control system
+        try {
+            cabinPressureSensor.inputChannel.basicConsume(cabinPressureSensor.queueName, true, (consumerTag, delivery) -> {
+                String message = new String(delivery.getBody(), "UTF-8");
+                if (message.equals("Landing")) {
+                    System.out.println("\u001B[31m" + "Cabin Pressure Sensor:" + "\u001B[0m" + "Ladning, stop sending cabin pressure to flight control");
+                    cabinPressureSensor.isLanding = true;
+                }
+            }, consumerTag -> {
+            });
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }
