@@ -1,10 +1,11 @@
-package PassengerAirlinerFlightManagementSystem.Sensors;
+package PassengerAirlinerFlightManagementSystemThreadpoolBug.Sensors;
 
 import PassengerAirlinerFlightManagementSystem.FCSMain;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -16,6 +17,8 @@ public class WeatherEnvironmentSensor implements Runnable{
     String queueName;
     ScheduledExecutorService timer;
     public WeatherEnvironmentSensor(Connection connection) throws IOException {
+        ExecutorService ex = Executors.newFixedThreadPool(1);
+        ex.submit(new WeatherEnvironmentSensorInput(this));
         timer = Executors.newScheduledThreadPool(1);
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.weatherEnvironmentExchangeName, "fanout");
@@ -29,7 +32,7 @@ public class WeatherEnvironmentSensor implements Runnable{
     boolean firstRun = true;
     String currentWeather = "Clear";
     String reportedWeather = "Clear";
-    static boolean hasResolvedTurbulence;
+    boolean hasResolvedTurbulence;
     boolean isLanding = false;
     @Override
     public void run() {
@@ -39,7 +42,7 @@ public class WeatherEnvironmentSensor implements Runnable{
 //                hasResolvedTurbulence = true;
 //            }
 //        }
-        timer.scheduleAtFixedRate(new WeatherEnvironmentSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
+//        timer.scheduleAtFixedRate(new WeatherEnvironmentSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
 
 //        System.out.println("\u001B[38;2;255;165;0m" + "Weather: " + currentWeather + "\u001B[0m");
         //send the speed to the flight control system
@@ -48,7 +51,7 @@ public class WeatherEnvironmentSensor implements Runnable{
             if (currentWeather != "Thunderstorm" || hasResolvedTurbulence == true) {
                 //if it rains, 1/10 chance of thunderstorm
                 if (currentWeather == "Rain") {
-                    if (Math.random() < 0.25) {
+                    if (Math.random() < 0.35) {
                         currentWeather = "Thunderstorm";
 //                        System.out.println("\u001B[38;2;255;165;0m" + "Weather is now a " + currentWeather + "\u001B[0m");
                         hasResolvedTurbulence = false;
