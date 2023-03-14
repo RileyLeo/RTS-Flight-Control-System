@@ -1,6 +1,7 @@
 package PassengerAirlinerFlightManagementSystem.Sensors;
 
 import PassengerAirlinerFlightManagementSystem.FCSMain;
+import PassengerAirlinerFlightManagementSystem.FlightControl;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.Channel;
@@ -21,7 +22,9 @@ public class CabinPressureSensor implements Runnable {
     ScheduledExecutorService timer;
 
     public CabinPressureSensor(Connection connection) throws IOException {
-        timer = Executors.newScheduledThreadPool(1);
+//        timer = Executors.newScheduledThreadPool(1);
+//        timer.scheduleAtFixedRate(new CabinPressureSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
+
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.cabinPressureExchangeName, "fanout");
         queueName = inputChannel.queueDeclare().getQueue();
@@ -35,10 +38,16 @@ public class CabinPressureSensor implements Runnable {
     public Integer CabinPressurePercentage = 100;
     boolean isLanding = false;
     boolean oneMore = true;
+    boolean firstRun = true;
 
     @Override
     public void run() {
-        timer.scheduleAtFixedRate(new CabinPressureSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
+        if (firstRun){
+            CabinPressureSensorInput cabinPressureSensorInput = new CabinPressureSensorInput(this);
+            Thread thread = new Thread(cabinPressureSensorInput);
+            thread.start();
+        }
+
         // adjust the cabin pressure
         int percentageDrop = rand.nextInt(5);
 
@@ -58,9 +67,10 @@ public class CabinPressureSensor implements Runnable {
         }
 
         try {
-            if ((CabinPressurePercentage < 100 && isLanding == false) || oneMore == true) {
-                String message = FCSMain.cabinPressureExchangeName + ":" + CabinPressurePercentage.toString();
-
+            if ((CabinPressurePercentage < 100 && isLanding == false && FlightControl.turbulanceCountermeasures == false) || oneMore == true ) {
+                //get time in nanoseconds
+                long time = System.nanoTime();
+                String message = FCSMain.cabinPressureExchangeName + ":" + CabinPressurePercentage.toString() + "-" + time;
                 outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));
                 System.out.println("\u001B[31m" + "Cabin Pressure Sensor:" + "\u001B[0m" + CabinPressurePercentage.toString() + " % cabin pressure sent to flight control");
                 if (CabinPressurePercentage == 100) {

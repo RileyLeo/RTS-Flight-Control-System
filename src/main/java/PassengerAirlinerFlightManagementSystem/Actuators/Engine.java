@@ -1,6 +1,7 @@
 package PassengerAirlinerFlightManagementSystem.Actuators;
 
 import PassengerAirlinerFlightManagementSystem.FCSMain;
+import PassengerAirlinerFlightManagementSystem.LatencyTester;
 import PassengerAirlinerFlightManagementSystem.Sensors.AltitudeSensor;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
@@ -11,6 +12,7 @@ public class Engine implements Runnable{
     Channel inputChannel;
     Channel outputChannel;
     String queueName;
+    public static boolean isAfterTurbulence = false;
     public Engine(Connection connection) throws IOException {
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
@@ -27,8 +29,12 @@ public class Engine implements Runnable{
         try {
             inputChannel.basicConsume(queueName, true,  (consumerTag, delivery) -> {
                 String message = new String(delivery.getBody(), "UTF-8");
+                boolean alreadyAdjusted = false;
                 System.out.println("\u001B[35m" + "Engine received - " + message + "\u001B[0m");
-                if (message.equals("Decelerate")) {
+                String[] parts = message.split("-");
+                long sendTime;
+                sendTime = Long.parseLong(parts[1]);
+                if (parts[0].equals("Decelerate")) {
                     if (!currentEngineState.equals("Decelerate")) {
                         System.out.println("\u001B[35m" + "Engine decelerated" + "\u001B[0m");
                         String engineMessage = "EN:Engine decelerated";
@@ -37,8 +43,9 @@ public class Engine implements Runnable{
                         System.out.println("\u001B[35m" + "Engine sent: " + engineMessage + "\u001B[0m");
                     } else {
                         System.out.println("\u001B[35m" + "Engine already in decelerate mode" + "\u001B[0m");
+                        alreadyAdjusted = true;
                     }
-                } else if (message.equals("Accelerate")) {
+                } else if (parts[0].equals("Accelerate")) {
                     if (!currentEngineState.equals("Accelerate")) {
                         System.out.println("\u001B[35m" + "Engine accelerated" + "\u001B[0m");
                         String engineMessage = "EN:Engine accelerated";
@@ -47,8 +54,9 @@ public class Engine implements Runnable{
                         System.out.println("\u001B[35m" + "Engine sent: " + engineMessage + "\u001B[0m");
                     } else {
                         System.out.println("\u001B[35m" + "Engine already in accelerate mode" + "\u001B[0m");
+                        alreadyAdjusted = true;
                     }
-                } else if (message.equals("Moderate")) {
+                } else if (parts[0].equals("Moderate")) {
                     if (!currentEngineState.equals("Moderate")) {
                         System.out.println("\u001B[35m" + "Engine moderated" + "\u001B[0m");
                         String engineMessage = "EN:Engine moderated";
@@ -57,8 +65,17 @@ public class Engine implements Runnable{
                         System.out.println("\u001B[35m" + "Engine sent: " + engineMessage + "\u001B[0m");
                     } else {
                         System.out.println("\u001B[35m" + "Engine already in maintain mode" + "\u001B[0m");
+                        alreadyAdjusted = true;
                     }
                 }
+                if (alreadyAdjusted == false && isAfterTurbulence == false){
+                    long currentTime = System.nanoTime();
+                    System.out.println("\u001B[32m" + "Wing Flaps current time: " + currentTime + "\u001B[0m");
+                    long totalTime = currentTime - sendTime;
+                    System.out.println("\u001B[32m" + "Wing Flaps Latency: " + totalTime + "\u001B[0m");
+                    LatencyTester.timeList.add((double) (totalTime)/1000000);
+                }
+                isAfterTurbulence = false;
             }, consumerTag -> {});
         } catch (IOException e) {
             throw new RuntimeException(e);

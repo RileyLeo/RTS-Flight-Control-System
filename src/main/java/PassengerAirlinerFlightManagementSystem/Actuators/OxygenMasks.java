@@ -1,6 +1,7 @@
 package PassengerAirlinerFlightManagementSystem.Actuators;
 
 import PassengerAirlinerFlightManagementSystem.FCSMain;
+import PassengerAirlinerFlightManagementSystem.LatencyTester;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
@@ -15,6 +16,7 @@ public class OxygenMasks implements Runnable {
     Channel outputChannel;
     String queueName;
     boolean isMaskDropped = false;
+    public static boolean isAfterTurbulence = false;
     public OxygenMasks(Connection connection) throws IOException {
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.oxygenMaskExchangeName, "fanout");
@@ -31,8 +33,12 @@ public class OxygenMasks implements Runnable {
 //            System.out.println("\u001B[36m" + "Oxygen Masks:" + "\u001B[0m" + " Oxygen Masks is waiting for flight control message");
             inputChannel.basicConsume(queueName, true,  (consumerTag, delivery) -> {
                 String message = new String(delivery.getBody(), "UTF-8");
+                boolean alreadyAdjusted = false;
                 System.out.println("\u001B[36m" + "Oxygen Masks received - " + message + "\u001B[0m");
-                if (message.equals("Deploy Masks")) {
+                String[] parts = message.split("-");
+                long sendTime;
+                sendTime = Long.parseLong(parts[1]);
+                if (parts[0].equals("Deploy Masks")) {
                     if (!isMaskDropped) {
                         System.out.println("\u001B[36m" +"Oxygen Masks deployed" + "\u001B[0m");
                         String oxygenMaskMessage = "OM:Deployed";
@@ -42,7 +48,7 @@ public class OxygenMasks implements Runnable {
                     } else{
                         System.out.println("\u001B[36m" + "Oxygen Masks are already deployed" + "\u001B[0m");
                     }
-                } else if (message.equals("Retract Masks")) {
+                } else if (parts[0].equals("Retract Masks")) {
                     if (isMaskDropped) {
                         System.out.println("\u001B[36m" + "Oxygen Masks have been retracted" + "\u001B[0m");
                         isMaskDropped = false;
@@ -53,6 +59,14 @@ public class OxygenMasks implements Runnable {
                     } else{
                         System.out.println("\u001B[36m" + "Oxygen Masks are already retracted" + "\u001B[0m");
                     }
+                    if (alreadyAdjusted == false && isAfterTurbulence == false){
+                        long currentTime = System.nanoTime();
+                        System.out.println("\u001B[32m" + "Wing Flaps current time: " + currentTime + "\u001B[0m");
+                        long totalTime = currentTime - sendTime;
+                        System.out.println("\u001B[32m" + "Wing Flaps Latency: " + totalTime + "\u001B[0m");
+                        LatencyTester.timeList.add((double) (totalTime)/1000000);
+                    }
+                    isAfterTurbulence = false;
                 }
             }, consumerTag -> {});
         } catch (IOException e) {

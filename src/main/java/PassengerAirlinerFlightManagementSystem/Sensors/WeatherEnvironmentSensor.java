@@ -16,7 +16,9 @@ public class WeatherEnvironmentSensor implements Runnable{
     String queueName;
     ScheduledExecutorService timer;
     public WeatherEnvironmentSensor(Connection connection) throws IOException {
-        timer = Executors.newScheduledThreadPool(1);
+//        timer = Executors.newScheduledThreadPool(1);
+//        timer.scheduleAtFixedRate(new WeatherEnvironmentSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
+
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.weatherEnvironmentExchangeName, "fanout");
         queueName = inputChannel.queueDeclare().getQueue();
@@ -33,13 +35,17 @@ public class WeatherEnvironmentSensor implements Runnable{
     boolean isLanding = false;
     @Override
     public void run() {
+        if (firstRun){
+            WeatherEnvironmentSensorInput weatherEnvironmentSensorInput = new WeatherEnvironmentSensorInput(this);
+            Thread thread = new Thread(weatherEnvironmentSensorInput);
+            thread.start();
+        }
         //randomly resolve turbulence when thunderstorm (testing purposes)
 //        if(currentWeather.equals("Thunderstorm") && !hasResolvedTurbulence){
 //            if(Math.random() < 0.1){
 //                hasResolvedTurbulence = true;
 //            }
 //        }
-        timer.scheduleAtFixedRate(new WeatherEnvironmentSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
 
 //        System.out.println("\u001B[38;2;255;165;0m" + "Weather: " + currentWeather + "\u001B[0m");
         //send the speed to the flight control system
@@ -59,7 +65,8 @@ public class WeatherEnvironmentSensor implements Runnable{
 
                 //weather report
                 if ((firstRun || currentWeather != reportedWeather) && !isLanding) {
-                    String message = FCSMain.weatherEnvironmentExchangeName + ":" + currentWeather;
+                    long time = System.nanoTime();
+                    String message = FCSMain.weatherEnvironmentExchangeName + ":" + currentWeather + "-" + time;
                     outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));
                     System.out.println("\u001B[38;2;255;165;0m" + "Weather Environment Sensor:"+ "\u001B[0m" + currentWeather + " weather sent to flight control");
                     reportedWeather = currentWeather;

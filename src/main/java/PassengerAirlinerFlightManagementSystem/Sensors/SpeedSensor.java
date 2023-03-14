@@ -2,6 +2,7 @@ package PassengerAirlinerFlightManagementSystem.Sensors;
 
 import PassengerAirlinerFlightManagementSystem.Actuators.Engine;
 import PassengerAirlinerFlightManagementSystem.FCSMain;
+import PassengerAirlinerFlightManagementSystem.FlightControl;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
@@ -16,9 +17,12 @@ public class SpeedSensor implements Runnable{
     Channel inputChannel;
     Channel outputChannel;
     String queueName;
-    ScheduledExecutorService timer;
+
     public SpeedSensor(Connection connection) throws IOException {
-        timer = Executors.newScheduledThreadPool(1);
+//        timer = Executors.newScheduledThreadPool(1);
+//        timer.scheduleAtFixedRate(new SpeedSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
+
+
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.speedExchangeName, "fanout");
         queueName = inputChannel.queueDeclare().getQueue();
@@ -34,10 +38,16 @@ public class SpeedSensor implements Runnable{
     boolean landingMode = false;
 //    boolean isSpeedZero = false;
     boolean isMessageAcknowledged = false;
+    boolean firstRun = true;
 
     @Override
     public void run() {
-        timer.scheduleAtFixedRate(new SpeedSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
+        if (firstRun){
+            SpeedSensorInput speedSensorInput = new SpeedSensorInput(this);
+            Thread thread = new Thread(speedSensorInput);
+            thread.start();
+        }
+
         //adjust the speed randomly
         int change = rand.nextInt(10);
         if (landingMode == false) {
@@ -58,10 +68,12 @@ public class SpeedSensor implements Runnable{
 
         //send the speed to the flight control system
         try {
-            if (isMessageAcknowledged == false) {
-                String message = FCSMain.speedExchangeName + ":" + currentCruiseSpeed.toString();
+            if (isMessageAcknowledged == false && FlightControl.turbulanceCountermeasures == false) {
+                //get time in nanoseconds
+                long time = System.nanoTime();
+                String message = FCSMain.speedExchangeName + ":" + currentCruiseSpeed.toString() + "-" + time;
                 outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));
-                System.out.println("\u001B[38;5;226m" + "Speed Sensor:"+ "\u001B[0m" + currentCruiseSpeed.toString() + " km/h speed sent to flight control");
+                System.out.println("\u001B[38;5;226m" + "Speed Sensor:"+ "\u001B[0m" + currentCruiseSpeed.toString() + " km/h speed sent to flight control" );
             }
         } catch (IOException e) {
             throw new RuntimeException(e);

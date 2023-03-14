@@ -1,6 +1,7 @@
 package PassengerAirlinerFlightManagementSystem.Sensors;
 
 import PassengerAirlinerFlightManagementSystem.FCSMain;
+import PassengerAirlinerFlightManagementSystem.FlightControl;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
@@ -17,7 +18,9 @@ public class AltitudeSensor implements Runnable {
     String queueName;
     ScheduledExecutorService timer;
     public AltitudeSensor(Connection connection) throws IOException {
-        timer = Executors.newScheduledThreadPool(1);
+//        timer = Executors.newScheduledThreadPool(1);
+//        timer.scheduleAtFixedRate(new AltitudeSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
+
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.altitudeExchangeName, "fanout");
         queueName = inputChannel.queueDeclare().getQueue();
@@ -32,11 +35,16 @@ public class AltitudeSensor implements Runnable {
     boolean landingMode = false;
 //    boolean isAltitudeZero = false;
     boolean isMessageAcknowledged = false;
+    boolean firstRun = true;
 
     @Override
     public void run() {
+        if (firstRun){
+            AltitudeSensorInput altitudeSensorInput = new AltitudeSensorInput(this);
+            Thread thread = new Thread(altitudeSensorInput);
+            thread.start();
+        }
 
-        timer.scheduleAtFixedRate(new AltitudeSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
         // adjust the altitude randomly
         int change = rand.nextInt(5);
         if (landingMode == false) {
@@ -50,15 +58,17 @@ public class AltitudeSensor implements Runnable {
         //final equation
         //change max/min= +- 2500
         // modifier max/min = +-1000
-        CurrentAltitude = CurrentAltitude + (change * 500) + (flapModifier * 1500);
+        CurrentAltitude = CurrentAltitude + (change * 1000) + (flapModifier * 1500);
         if (CurrentAltitude < 0) {
             CurrentAltitude = 0;
         }
 
         // send the altitude to the flight control system
         try {
-            if (!isMessageAcknowledged) {
-                String message = FCSMain.altitudeExchangeName + ":" + CurrentAltitude.toString();
+            if (!isMessageAcknowledged && FlightControl.turbulanceCountermeasures == false) {
+                //get time in nanoseconds
+                long time = System.nanoTime();
+                String message = FCSMain.altitudeExchangeName + ":" + CurrentAltitude.toString() + "-" + time;
                 outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));
                 System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + CurrentAltitude.toString() + " ft altitude sent to flight control");
             }

@@ -14,6 +14,11 @@
             <artifactId>amqp-client</artifactId>
             <version>5.16.0</version>
         </dependency>
+        <dependency>
+            <groupId>tech.tablesaw</groupId>
+            <artifactId>tablesaw-jsplot</artifactId>
+            <version>0.43.1</version>
+        </dependency>
     </dependencies>
     <properties>
         <maven.compiler.source>17</maven.compiler.source>

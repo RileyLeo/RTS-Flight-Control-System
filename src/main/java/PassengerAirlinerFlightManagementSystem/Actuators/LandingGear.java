@@ -16,7 +16,8 @@ public class LandingGear implements Runnable {
     String queueName;
     ScheduledExecutorService timer;
     public LandingGear(Connection connection) throws IOException {
-        timer = Executors.newScheduledThreadPool(1);
+//        timer = Executors.newScheduledThreadPool(1);
+//        timer.scheduleAtFixedRate(new LandingGearInput(this), 0, 1000, TimeUnit.MILLISECONDS);
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.landingGearExchangeName, "fanout");
         queueName = inputChannel.queueDeclare().getQueue();
@@ -28,10 +29,15 @@ public class LandingGear implements Runnable {
 
     boolean isLandingGearDeployed = false;
     boolean isMessageAcknowledged = false;
+    boolean firstRun = true;
 
     @Override
     public void run() {
-        timer.scheduleAtFixedRate(new LandingGearInput(this), 0, 1000, TimeUnit.MILLISECONDS);
+        if (firstRun){
+            LandingGearInput landingGearInput = new LandingGearInput(this);
+            Thread thread = new Thread(landingGearInput);
+            thread.start();
+        }
         if (isLandingGearDeployed && !isMessageAcknowledged){
             try {
                 String message = FCSMain.landingGearExchangeName + ":Landing Gear Deployed";

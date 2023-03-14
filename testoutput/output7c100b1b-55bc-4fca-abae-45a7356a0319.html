@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>Latency against Iterations</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div id='target' ></div>
+        <script>
+        var target_target = document.getElementById('target');
+        var layout = {
+    title: 'Latency against Iterations',
+    height: 600,
+    width: 800,
+    xaxis: {
+    title: 'Iterations',
+    },
+
+    yaxis: {
+    title: 'Latency in milliseconds',
+    },
+
+};
+
+var trace0 =
+{
+x: ["1.0","2.0","3.0","4.0","5.0","6.0","7.0","8.0","9.0","10.0","11.0","12.0","13.0","14.0","15.0","16.0","17.0","18.0","19.0","20.0","21.0","22.0"],
+y: ["2023700.0","2153600.0","1533800.0","2004700.0","1838200.0","1762100.0","1702900.0","1219800.0","1214700.0","1121500.0","1555300.0","1070300.0","1094000.0","1240300.0","1182100.0","1383800.0","1698400.0","1415300.0","1010100.0","1208800.0","1503600.0","1807700.0"],
+mode: 'lines',
+xaxis: 'x',
+yaxis: 'y',
+type: 'scatter',
+name: '',
+};
+
+        var data = [ trace0];
+Plotly.newPlot(target_target, data, layout);            </script>
+
+</body>
+</html>
