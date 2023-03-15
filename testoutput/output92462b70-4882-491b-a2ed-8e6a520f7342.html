@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>Latency from sensor to actuators (Average: 1.3295308ms))</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div id='target' ></div>
+        <script>
+        var target_target = document.getElementById('target');
+        var layout = {
+    title: 'Latency from sensor to actuators (Average: 1.3295308ms))',
+    height: 600,
+    width: 800,
+    xaxis: {
+    title: 'Iterations',
+    },
+
+    yaxis: {
+    title: 'Latency in milliseconds',
+    },
+
+};
+
+var trace0 =
+{
+x: ["1.0","2.0","3.0","4.0","5.0","6.0","7.0","8.0","9.0","10.0","11.0","12.0","13.0","14.0","15.0","16.0","17.0","18.0","19.0","20.0","21.0","22.0","23.0","24.0","25.0","26.0"],
+y: ["3.8498","1.531","2.4283","2.949","1.4437","1.2859","0.8969","1.2438","0.9934","0.9783","1.0618","1.2143","0.9942","1.0222","0.9779","1.0229","1.1632","1.0508","1.0634","1.143","0.8744","0.9911","0.9323","1.149","1.2452","1.062"],
+mode: 'lines',
+xaxis: 'x',
+yaxis: 'y',
+type: 'scatter',
+name: '',
+};
+
+        var data = [ trace0];
+Plotly.newPlot(target_target, data, layout);            </script>
+
+</body>
+</html>

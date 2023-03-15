@@ -46,7 +46,6 @@ public class FlightControl implements Runnable {
 
     @Override
     public void run() {
-        //test
         if (isLanding) {
             //Landing sequence
             landingSequence();
@@ -60,154 +59,165 @@ public class FlightControl implements Runnable {
                     } else {
                         String message = new String(delivery.getBody(), "UTF-8");
                         System.out.println("Flight Control received - " + message);
-                        if (message.contains("CP:")) {
-                            //Cabin Pressure
-                            String[] parts = message.split(":");
-                            String time = (parts[1].split("-"))[1];
-                            int cabinPressure = Integer.parseInt((parts[1].split("-"))[0]);
-                            if (cabinPressure < 80 && !isMasksDeployed) {
-                                System.out.println("Cabin pressure is low, deploying masks");
-                                // deploy oxygen mask
-                                // send a message to oxygen mask to come down
-                                outputChannel.exchangeDeclare(FCSMain.oxygenMaskExchangeName, "fanout");
-                                String oxygenMaskMessage = "Deploy Masks" + "-" + time;
-                                outputChannel.basicPublish(FCSMain.oxygenMaskExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
-                                System.out.println("Flight Control sent: " + oxygenMaskMessage);
-                            } else if (cabinPressure > 90 && isMasksDeployed) {
-                                System.out.println("Cabin pressure is high, retracting masks");
-                                // retract oxygen mask
-                                // send a message to oxygen mask to retract
-                                outputChannel.exchangeDeclare(FCSMain.oxygenMaskExchangeName, "fanout");
-                                String oxygenMaskMessage = "Retract Masks" + "-" + time;
-                                outputChannel.basicPublish(FCSMain.oxygenMaskExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
-                                System.out.println("Flight Control sent: " + oxygenMaskMessage);
-                            }
-                        } else if (message.contains("OM:")) {
-                            // oxygen mask status
-                            String[] parts = message.split(":");
-                            String oxygenMaskStatus = parts[1];
-                            if (oxygenMaskStatus.equals("Deployed")) {
-                                isMasksDeployed = true;
-                                System.out.println("Oxygen masks deployed successfully");
-                            } else if (oxygenMaskStatus.equals("Retracted")) {
-                                isMasksDeployed = false;
-                                System.out.println("Oxygen masks retracted successfully");
-                            }
-                        } else if (message.contains("AL")) {
-                            // altitude
-                            String[] parts = message.split(":");
-                            String time = (parts[1].split("-"))[1];
-                            int altitude = Integer.parseInt((parts[1].split("-"))[0]);
+                        String header = message.split(":")[0];
+                        System.out.println("Header: " + header);
+                        String[] parts;
+                        switch (header){
+                            case "CP":
+                                //Cabin Pressure
+                                parts = message.split(":");
+                                String time = (parts[1].split("-"))[1];
+                                int cabinPressure = Integer.parseInt((parts[1].split("-"))[0]);
+                                if (cabinPressure < 80 && !isMasksDeployed) {
+                                    System.out.println("Cabin pressure is low, deploying masks");
+                                    // deploy oxygen mask
+                                    // send a message to oxygen mask to come down
+                                    outputChannel.exchangeDeclare(FCSMain.oxygenMaskExchangeName, "fanout");
+                                    String oxygenMaskMessage = "Deploy Masks" + "-" + time;
+                                    outputChannel.basicPublish(FCSMain.oxygenMaskExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
+                                    System.out.println("Flight Control sent: " + oxygenMaskMessage);
+                                } else if (cabinPressure > 90 && isMasksDeployed) {
+                                    System.out.println("Cabin pressure is high, retracting masks");
+                                    // retract oxygen mask
+                                    // send a message to oxygen mask to retract
+                                    outputChannel.exchangeDeclare(FCSMain.oxygenMaskExchangeName, "fanout");
+                                    String oxygenMaskMessage = "Retract Masks" + "-" + time;
+                                    outputChannel.basicPublish(FCSMain.oxygenMaskExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
+                                    System.out.println("Flight Control sent: " + oxygenMaskMessage);
+                                }
+                                break;
+                            case "OM":
+                                // oxygen mask status
+                                parts = message.split(":");
+                                String oxygenMaskStatus = parts[1];
+                                if (oxygenMaskStatus.equals("Deployed")) {
+                                    isMasksDeployed = true;
+                                    System.out.println("Oxygen masks deployed successfully");
+                                } else if (oxygenMaskStatus.equals("Retracted")) {
+                                    isMasksDeployed = false;
+                                    System.out.println("Oxygen masks retracted successfully");
+                                }
+                                break;
+                            case "AL":
+                                // altitude
+                                parts = message.split(":");
+                                time = (parts[1].split("-"))[1];
+                                int altitude = Integer.parseInt((parts[1].split("-"))[0]);
 //                            System.out.println(time + " - " + altitude);
-                            if (turbulanceCountermeasures == false) {
-                                if (altitude > upperboundAltitudeDuringFlight && !flapPosition.equals("low")) {
-                                    System.out.println("Altitude is high, adjusting wing flaps to a lower angle");
-                                    // adjust wing flaps to a lower angle
-                                    // send a message to wing flaps to adjust
-                                    outputChannel.exchangeDeclare(FCSMain.wingFlapsExchangeName, "fanout");
-                                    String wingFlapsMessage = "Adjust:Lower-" + time;
-                                    outputChannel.basicPublish(FCSMain.wingFlapsExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
-                                } else if (altitude < lowerboundAltitudeDuringFlight && !flapPosition.equals("high")) {
-                                    System.out.println("Altitude is low, adjusting wing flaps to a higher angle");
-                                    // adjust wing flaps to a higher angle
-                                    // send a message to wing flaps to adjust
-                                    outputChannel.exchangeDeclare(FCSMain.wingFlapsExchangeName, "fanout");
-                                    String wingFlapsMessage = "Adjust:Higher-" + time;
-                                    outputChannel.basicPublish(FCSMain.wingFlapsExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
-                                } else if (altitude >= middleboundAltitudeDuringFlight - middleboundAltitudeThreshold && altitude <= middleboundAltitudeDuringFlight +
-                                        middleboundAltitudeThreshold && !flapPosition.equals("neutral")) {
-                                    System.out.println("Altitude is in the middle, adjusting wing flaps to a middle angle");
-                                    // adjust wing flaps to a normal angle
-                                    // send a message to wing flaps to adjust
-                                    outputChannel.exchangeDeclare(FCSMain.wingFlapsExchangeName, "fanout");
-                                    String wingFlapsMessage = "Adjust:Normal-" + time;
-                                    outputChannel.basicPublish(FCSMain.wingFlapsExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
+                                if (turbulanceCountermeasures == false) {
+                                    if (altitude > upperboundAltitudeDuringFlight && !flapPosition.equals("low")) {
+                                        System.out.println("Altitude is high, adjusting wing flaps to a lower angle");
+                                        // adjust wing flaps to a lower angle
+                                        // send a message to wing flaps to adjust
+                                        outputChannel.exchangeDeclare(FCSMain.wingFlapsExchangeName, "fanout");
+                                        String wingFlapsMessage = "Adjust:Lower-" + time;
+                                        outputChannel.basicPublish(FCSMain.wingFlapsExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
+                                    } else if (altitude < lowerboundAltitudeDuringFlight && !flapPosition.equals("high")) {
+                                        System.out.println("Altitude is low, adjusting wing flaps to a higher angle");
+                                        // adjust wing flaps to a higher angle
+                                        // send a message to wing flaps to adjust
+                                        outputChannel.exchangeDeclare(FCSMain.wingFlapsExchangeName, "fanout");
+                                        String wingFlapsMessage = "Adjust:Higher-" + time;
+                                        outputChannel.basicPublish(FCSMain.wingFlapsExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
+                                    } else if (altitude >= middleboundAltitudeDuringFlight - middleboundAltitudeThreshold && altitude <= middleboundAltitudeDuringFlight +
+                                            middleboundAltitudeThreshold && !flapPosition.equals("neutral")) {
+                                        System.out.println("Altitude is in the middle, adjusting wing flaps to a middle angle");
+                                        // adjust wing flaps to a normal angle
+                                        // send a message to wing flaps to adjust
+                                        outputChannel.exchangeDeclare(FCSMain.wingFlapsExchangeName, "fanout");
+                                        String wingFlapsMessage = "Adjust:Normal-" + time;
+                                        outputChannel.basicPublish(FCSMain.wingFlapsExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
+                                    }
                                 }
-                            }
-                        } else if (message.contains("WF:")) {
-                            // wing flaps status
-                            String[] parts = message.split(":");
-                            String wingFlapsStatus = parts[1];
-                            if (wingFlapsStatus.equals("Wing flaps adjusted lower")) {
-                                System.out.println("Wing flaps adjusted lower successfully");
-                                flapPosition = "low";
-                            } else if (wingFlapsStatus.equals("Wing flaps adjusted higher")) {
-                                System.out.println("Wing flaps adjusted higher successfully");
-                                flapPosition = "high";
-                            } else if (wingFlapsStatus.equals("Wing flaps adjusted neutral position")) {
-                                System.out.println("Wing flaps adjusted to normal successfully");
-                                flapPosition = "neutral";
-                            }
-                            //Inform Altitude sensor of the adjustment
-                            outputChannel.exchangeDeclare(FCSMain.altitudeExchangeName, "fanout");
-                            String altitudeControlMessage = wingFlapsStatus;
-                            outputChannel.basicPublish(FCSMain.altitudeExchangeName, "", null, altitudeControlMessage.getBytes("UTF-8"));
-                        } else if (message.contains("SP:")) {
-                            //Speed Status
-                            String[] parts = message.split(":");
-                            String time = (parts[1].split("-"))[1];
-                            int speed = Integer.parseInt((parts[1].split("-"))[0]);
-                            if (turbulanceCountermeasures == false) {
-                                if (speed > upperboundSpeedDuringFlight && !engineMode.equals("Decelerated")) {
-                                    System.out.println("Speed is high, decelerate engine to slow down");
-                                    // decelerate engine to slow down
-                                    // send a message to engine to decelerate
-                                    outputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
-                                    String engineMessage = "Decelerate" + '-' + time;
-                                    outputChannel.basicPublish(FCSMain.engineExchangeName, "", null, engineMessage.getBytes("UTF-8"));
-                                } else if (speed < lowerboundSpeedDuringFlight && !engineMode.equals("Accelerated")) {
-                                    System.out.println("Speed is low, accelerate engine to speed up");
-                                    // accelerate engine to speed up
-                                    // send a message to engine to accelerate
-                                    outputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
-                                    String engineMessage = "Accelerate"+ '-' + time;
-                                    outputChannel.basicPublish(FCSMain.engineExchangeName, "", null, engineMessage.getBytes("UTF-8"));
-                                } else if (speed >= middleboundSpeedDuringFlight - middleboundSpeedThreshold && speed <= middleboundSpeedDuringFlight + middleboundSpeedThreshold && !engineMode.equals("Moderate")) {
-                                    System.out.println("Normal Speed, putting engine to moderate speed");
-                                    // maintain engine speed
-                                    // send a message to engine to maintain speed
-                                    outputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
-                                    String engineMessage = "Moderate"+ '-' + time;
-                                    outputChannel.basicPublish(FCSMain.engineExchangeName, "", null, engineMessage.getBytes("UTF-8"));
+                                break;
+                            case "WF":
+                                // wing flaps status
+                                parts = message.split(":");
+                                String wingFlapsStatus = parts[1];
+                                if (wingFlapsStatus.equals("Wing flaps adjusted lower")) {
+                                    System.out.println("Wing flaps adjusted lower successfully");
+                                    flapPosition = "low";
+                                } else if (wingFlapsStatus.equals("Wing flaps adjusted higher")) {
+                                    System.out.println("Wing flaps adjusted higher successfully");
+                                    flapPosition = "high";
+                                } else if (wingFlapsStatus.equals("Wing flaps adjusted neutral position")) {
+                                    System.out.println("Wing flaps adjusted to normal successfully");
+                                    flapPosition = "neutral";
                                 }
-                            }
-                        } else if (message.contains("EN:")) {
-                            // Engine Status
-                            String[] parts = message.split(":");
-                            String engineStatus = parts[1];
-                            if (engineStatus.equals("Engine decelerated")) {
-                                System.out.println("Engine decelerated successfully");
-                                engineMode = "Decelerated";
-                            } else if (engineStatus.equals("Engine accelerated")) {
-                                System.out.println("Engine accelerated successfully");
-                                engineMode = "Accelerated";
-                            } else if (engineStatus.equals("Engine moderated")) {
-                                System.out.println("Engine speed maintained successfully");
-                                engineMode = "Moderate";
-                            }
-                            //Inform Speed sensor of the adjustment
-                            outputChannel.exchangeDeclare(FCSMain.speedExchangeName, "fanout");
-                            String speedControlMessage = engineStatus;
-                            outputChannel.basicPublish(FCSMain.speedExchangeName, "", null, speedControlMessage.getBytes("UTF-8"));
-                        } else if (message.contains("WE:")) {
-                            String[] parts = message.split(":");
-                            String weatherStatusAndTime = parts[1];
-                            String weatherStatus = weatherStatusAndTime.split("-")[0];
-                            long time = Long.parseLong(weatherStatusAndTime.split("-")[1]);
-                            if (weatherStatus.equals("Clear")) {
-                                System.out.println("Weather is clear, no need to adjust");
-                                currentWeather = "Clear";
-                            } else if (weatherStatus.equals("Rain")) {
-                                System.out.println("Weather is rainy, watch up for potential thunderstorm!");
-                                currentWeather = "Rain";
-                            } else if (weatherStatus.equals("Thunderstorm")) {
-                                System.out.println("There is a thunderstorm, turbulence is expected!");
-                                currentWeather = "Thunderstorm";
-                                System.out.println("Activating turbulence countermeasures");
-                                // activate turbulence countermeasures
-                                turbulanceCountermeasures = true;
-                                turbulenceSequence(time);
-                            }
+                                //Inform Altitude sensor of the adjustment
+                                outputChannel.exchangeDeclare(FCSMain.altitudeExchangeName, "fanout");
+                                String altitudeControlMessage = wingFlapsStatus;
+                                outputChannel.basicPublish(FCSMain.altitudeExchangeName, "", null, altitudeControlMessage.getBytes("UTF-8"));
+                                break;
+                            case "SP":
+                                //Speed Status
+                                parts = message.split(":");
+                                time = (parts[1].split("-"))[1];
+                                int speed = Integer.parseInt((parts[1].split("-"))[0]);
+                                if (turbulanceCountermeasures == false) {
+                                    if (speed > upperboundSpeedDuringFlight && !engineMode.equals("Decelerated")) {
+                                        System.out.println("Speed is high, decelerate engine to slow down");
+                                        // decelerate engine to slow down
+                                        // send a message to engine to decelerate
+                                        outputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
+                                        String engineMessage = "Decelerate" + '-' + time;
+                                        outputChannel.basicPublish(FCSMain.engineExchangeName, "", null, engineMessage.getBytes("UTF-8"));
+                                    } else if (speed < lowerboundSpeedDuringFlight && !engineMode.equals("Accelerated")) {
+                                        System.out.println("Speed is low, accelerate engine to speed up");
+                                        // accelerate engine to speed up
+                                        // send a message to engine to accelerate
+                                        outputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
+                                        String engineMessage = "Accelerate"+ '-' + time;
+                                        outputChannel.basicPublish(FCSMain.engineExchangeName, "", null, engineMessage.getBytes("UTF-8"));
+                                    } else if (speed >= middleboundSpeedDuringFlight - middleboundSpeedThreshold && speed <= middleboundSpeedDuringFlight + middleboundSpeedThreshold && !engineMode.equals("Moderate")) {
+                                        System.out.println("Normal Speed, putting engine to moderate speed");
+                                        // maintain engine speed
+                                        // send a message to engine to maintain speed
+                                        outputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
+                                        String engineMessage = "Moderate"+ '-' + time;
+                                        outputChannel.basicPublish(FCSMain.engineExchangeName, "", null, engineMessage.getBytes("UTF-8"));
+                                    }
+                                }
+                                break;
+                            case "EN":
+                                // Engine Status
+                                parts = message.split(":");
+                                String engineStatus = parts[1];
+                                if (engineStatus.equals("Engine decelerated")) {
+                                    System.out.println("Engine decelerated successfully");
+                                    engineMode = "Decelerated";
+                                } else if (engineStatus.equals("Engine accelerated")) {
+                                    System.out.println("Engine accelerated successfully");
+                                    engineMode = "Accelerated";
+                                } else if (engineStatus.equals("Engine moderated")) {
+                                    System.out.println("Engine speed maintained successfully");
+                                    engineMode = "Moderate";
+                                }
+                                //Inform Speed sensor of the adjustment
+                                outputChannel.exchangeDeclare(FCSMain.speedExchangeName, "fanout");
+                                String speedControlMessage = engineStatus;
+                                outputChannel.basicPublish(FCSMain.speedExchangeName, "", null, speedControlMessage.getBytes("UTF-8"));
+                                break;
+                            case "WE":
+                                parts = message.split(":");
+                                String weatherStatusAndTime = parts[1];
+                                String weatherStatus = weatherStatusAndTime.split("-")[0];
+                                long timeLong = Long.parseLong(weatherStatusAndTime.split("-")[1]);
+                                if (weatherStatus.equals("Clear")) {
+                                    System.out.println("Weather is clear, no need to adjust");
+                                    currentWeather = "Clear";
+                                } else if (weatherStatus.equals("Rain")) {
+                                    System.out.println("Weather is rainy, watch up for potential thunderstorm!");
+                                    currentWeather = "Rain";
+                                } else if (weatherStatus.equals("Thunderstorm")) {
+                                    System.out.println("There is a thunderstorm, turbulence is expected!");
+                                    currentWeather = "Thunderstorm";
+                                    System.out.println("Activating turbulence countermeasures");
+                                    // activate turbulence countermeasures
+                                    turbulanceCountermeasures = true;
+                                    turbulenceSequence(timeLong);
+                                }
+                                break;
                         }
                     }
                 }, consumerTag -> {
