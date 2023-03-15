@@ -18,9 +18,6 @@ public class AltitudeSensor implements Runnable {
     String queueName;
     ScheduledExecutorService timer;
     public AltitudeSensor(Connection connection) throws IOException {
-//        timer = Executors.newScheduledThreadPool(1);
-//        timer.scheduleAtFixedRate(new AltitudeSensorInput(this), 0, 1000, TimeUnit.MILLISECONDS);
-
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.altitudeExchangeName, "fanout");
         queueName = inputChannel.queueDeclare().getQueue();
@@ -69,8 +66,10 @@ public class AltitudeSensor implements Runnable {
                 //get time in nanoseconds
                 long time = System.nanoTime();
                 String message = FCSMain.altitudeExchangeName + ":" + CurrentAltitude.toString() + "-" + time;
-                outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));
-                System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + CurrentAltitude.toString() + " ft altitude sent to flight control");
+                outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null
+                        , message.getBytes("UTF-8"));
+                System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + CurrentAltitude.toString() +
+                        " ft altitude sent to flight control");
             }
         } catch (IOException e) {
             throw new RuntimeException(e);

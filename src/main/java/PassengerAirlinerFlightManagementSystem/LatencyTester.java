@@ -27,7 +27,7 @@ public class LatencyTester {
     public void plot() {
         AtomicInteger index = new AtomicInteger(1);
 
-        Figure lineChart = LinePlot.create("Latency" + " against Iterations",
+        Figure lineChart = LinePlot.create("Latency from sensor to actuators (Average: " + calculateTime() + "ms))",
                 "Iterations", timeList.stream().mapToDouble(aDouble -> index.getAndIncrement()).toArray(),
                 "Latency in milliseconds", timeList.stream().mapToDouble(aDouble -> aDouble).toArray());
 

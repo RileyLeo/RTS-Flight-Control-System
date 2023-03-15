@@ -70,7 +70,6 @@ public class FCSMain {
 //        System.in.read();
         //set landing mode to true when 45 second has elapsed
         try {
-//            Thread.sleep(45000);
             Thread.sleep(60000);
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -80,9 +79,10 @@ public class FCSMain {
         while (!FlightControl.isLandingGearDeployed || !FlightControl.isAltitudeZero || !FlightControl.isSpeedZero) {
         }
         timer.shutdown();
-        //sleep for 5 seconds to make sure all the messages are sent
+        ex.shutdown();
+        //sleep for 0.5 seconds to make sure all the messages are sent
         try {
-            Thread.sleep(5000);
+            Thread.sleep(500);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -90,10 +90,11 @@ public class FCSMain {
 
         long endingTime = System.nanoTime();
         float totalTime = (float) ((endingTime - startingTime)/ 1_000_000_000);
-        //calculte the total time taken for landing in miliseconds
+        //calculate the total time taken for landing in miliseconds
         float totalTimeInMiliseconds =  (float) (endingTime - startingTime)/ 1_000_000;
         System.out.println("Total time taken for landing: " + totalTimeInMiliseconds + " miliseconds");
 
+        //create latency graph
         LatencyTester latencyTester = new LatencyTester();
         System.out.println("Average latency: " + latencyTester.calculateTime() + " miliseconds");
         latencyTester.display();

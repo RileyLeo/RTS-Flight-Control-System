@@ -114,7 +114,8 @@ public class FlightControl implements Runnable {
                                     outputChannel.exchangeDeclare(FCSMain.wingFlapsExchangeName, "fanout");
                                     String wingFlapsMessage = "Adjust:Higher-" + time;
                                     outputChannel.basicPublish(FCSMain.wingFlapsExchangeName, "", null, wingFlapsMessage.getBytes("UTF-8"));
-                                } else if (altitude >= middleboundAltitudeDuringFlight - middleboundAltitudeThreshold && altitude <= middleboundAltitudeDuringFlight + middleboundAltitudeThreshold && !flapPosition.equals("neutral")) {
+                                } else if (altitude >= middleboundAltitudeDuringFlight - middleboundAltitudeThreshold && altitude <= middleboundAltitudeDuringFlight +
+                                        middleboundAltitudeThreshold && !flapPosition.equals("neutral")) {
                                     System.out.println("Altitude is in the middle, adjusting wing flaps to a middle angle");
                                     // adjust wing flaps to a normal angle
                                     // send a message to wing flaps to adjust
