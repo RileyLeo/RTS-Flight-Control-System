@@ -5,9 +5,8 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
 import java.io.IOException;
-import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class WeatherEnvironmentSensor implements Runnable{
 
@@ -28,14 +27,14 @@ public class WeatherEnvironmentSensor implements Runnable{
         outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
 
     }
-    boolean firstRun = true;
+    AtomicBoolean firstRun = new AtomicBoolean(true);
     String currentWeather = "Clear";
     String reportedWeather = "Clear";
-    static boolean hasResolvedTurbulence;
-    boolean isLanding = false;
+    static AtomicBoolean hasResolvedTurbulence = new AtomicBoolean();
+    AtomicBoolean isLanding = new AtomicBoolean(false);
     @Override
     public void run() {
-        if (firstRun){
+        if (firstRun.get()){
             WeatherEnvironmentSensorInput weatherEnvironmentSensorInput = new WeatherEnvironmentSensorInput(this);
             Thread thread = new Thread(weatherEnvironmentSensorInput);
             thread.start();
@@ -51,26 +50,26 @@ public class WeatherEnvironmentSensor implements Runnable{
         //send the speed to the flight control system
         try {
             // weather check
-            if (currentWeather != "Thunderstorm" || hasResolvedTurbulence == true) {
+            if (currentWeather != "Thunderstorm" || hasResolvedTurbulence.get() == true) {
                 //if it rains, 1/10 chance of thunderstorm
                 if (currentWeather == "Rain") {
                     if (Math.random() < 0.25) {
                         currentWeather = "Thunderstorm";
 //                        System.out.println("\u001B[38;2;255;165;0m" + "Weather is now a " + currentWeather + "\u001B[0m");
-                        hasResolvedTurbulence = false;
+                        hasResolvedTurbulence.set(false);
                     }
-                }else if (currentWeather == "Thunderstorm" && hasResolvedTurbulence == true){
+                }else if (currentWeather == "Thunderstorm" && hasResolvedTurbulence.get() == true){
                     currentWeather = "Clear";
                 }
 
                 //weather report
-                if ((firstRun || currentWeather != reportedWeather) && !isLanding) {
+                if ((firstRun.get() || currentWeather != reportedWeather) && !isLanding.get()) {
                     long time = System.nanoTime();
                     String message = FCSMain.weatherEnvironmentExchangeName + ":" + currentWeather + "-" + time;
                     outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes("UTF-8"));
                     System.out.println("\u001B[38;2;255;165;0m" + "Weather Environment Sensor:"+ "\u001B[0m" + currentWeather + " weather sent to flight control");
                     reportedWeather = currentWeather;
-                    firstRun = false;
+                    firstRun.set(false);
                     System.out.println("\u001B[38;2;255;165;0m" + "Weather Environment Sensor:"+ "\u001B[0m" + "Standby for weather change");
                 }
                 //1/10 chance of weather change to rain or clear (alternating)
@@ -103,13 +102,13 @@ class WeatherEnvironmentSensorInput implements Runnable {
             weatherEnvironmentSensor.inputChannel.basicConsume(weatherEnvironmentSensor.queueName, true, (consumerTag, delivery) -> {
                 String message = new String(delivery.getBody(), "UTF-8");
                 if (message.equals("Turbulence resolved")) {
-                    weatherEnvironmentSensor.hasResolvedTurbulence = true;
+                    weatherEnvironmentSensor.hasResolvedTurbulence.set(true);
                     System.out.println("\u001B[38;2;255;165;0m" + "Weather Environment Sensor:"+ "\u001B[0m" + "Turbulence resolved");
                 } else if (message.equals("Landing")){
                     weatherEnvironmentSensor.currentWeather = "Clear";
-                    weatherEnvironmentSensor.hasResolvedTurbulence = true;
+                    weatherEnvironmentSensor.hasResolvedTurbulence.set(true);
                     System.out.println("\u001B[38;2;255;165;0m" + "Weather Environment Sensor:"+ "\u001B[0m" + "Landing, weather is now clear, stopping message sending");
-                    weatherEnvironmentSensor.isLanding = true;
+                    weatherEnvironmentSensor.isLanding.set(true);
                 }
             }, consumerTag -> {
             });

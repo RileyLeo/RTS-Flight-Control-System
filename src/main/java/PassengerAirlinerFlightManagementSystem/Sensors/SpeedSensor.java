@@ -8,9 +8,7 @@ import com.rabbitmq.client.Connection;
 
 import java.io.IOException;
 import java.util.Random;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SpeedSensor implements Runnable{
 
@@ -35,14 +33,13 @@ public class SpeedSensor implements Runnable{
     //base speed in km/h
     Integer currentCruiseSpeed = 900;
     double engineModifier = 0;
-    boolean landingMode = false;
-//    boolean isSpeedZero = false;
-    boolean isMessageAcknowledged = false;
-    boolean firstRun = true;
+    AtomicBoolean landingMode = new AtomicBoolean(false);
+    AtomicBoolean isMessageAcknowledged = new AtomicBoolean(false);
+    AtomicBoolean firstRun = new AtomicBoolean(true);
 
     @Override
     public void run() {
-        if (firstRun){
+        if (firstRun.get()){
             SpeedSensorInput speedSensorInput = new SpeedSensorInput(this);
             Thread thread = new Thread(speedSensorInput);
             thread.start();
@@ -50,7 +47,7 @@ public class SpeedSensor implements Runnable{
 
         //adjust the speed randomly
         int change = rand.nextInt(10);
-        if (landingMode == false) {
+        if (landingMode.get() == false) {
             if (rand.nextBoolean()) {
                 change *= -1;
             }
@@ -68,7 +65,7 @@ public class SpeedSensor implements Runnable{
 
         //send the speed to the flight control system
         try {
-            if (isMessageAcknowledged == false && FlightControl.turbulanceCountermeasures == false) {
+            if (isMessageAcknowledged.get() == false && FlightControl.turbulanceCountermeasures.get() == false) {
                 //get time in nanoseconds
                 long time = System.nanoTime();
                 String message = FCSMain.speedExchangeName + ":" + currentCruiseSpeed.toString() + "-" + time;
@@ -104,10 +101,10 @@ class SpeedSensorInput implements Runnable {
                     speedSensor.engineModifier = 0;
                 }else if (message.equals("Landing mode activate, Engine decelerated")) {
                     System.out.println("\u001B[38;5;226m" + "Speed Sensor:"+ "\u001B[0m" + "Landing mode activated, Engine decelerated");
-                    speedSensor.landingMode = true;
+                    speedSensor.landingMode.set(true);
                     speedSensor.engineModifier = -1.5;
                 }else if (message.equals("Message Acknowledged")) {
-                    speedSensor.isMessageAcknowledged = true;
+                    speedSensor.isMessageAcknowledged.set(true);
 //                    speedSensor.isSpeedZero = true;
                     System.out.println("\u001B[38;5;226m" + "Speed Sensor:"+ "\u001B[0m" + "Message acknowledged, sending stopped");
                 }

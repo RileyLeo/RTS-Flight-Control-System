@@ -5,9 +5,9 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
 import java.io.IOException;
-import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+
 
 public class LandingGear implements Runnable {
 
@@ -27,18 +27,18 @@ public class LandingGear implements Runnable {
         outputChannel.exchangeDeclare(FCSMain.flightControlExchangeName, "fanout");
     }
 
-    boolean isLandingGearDeployed = false;
-    boolean isMessageAcknowledged = false;
-    boolean firstRun = true;
+    AtomicBoolean isLandingGearDeployed = new AtomicBoolean(false);
+    AtomicBoolean isMessageAcknowledged = new AtomicBoolean(false);
+    AtomicBoolean firstRun = new AtomicBoolean(true);
 
     @Override
     public void run() {
-        if (firstRun){
+        if (firstRun.get()){
             LandingGearInput landingGearInput = new LandingGearInput(this);
             Thread thread = new Thread(landingGearInput);
             thread.start();
         }
-        if (isLandingGearDeployed && !isMessageAcknowledged){
+        if (isLandingGearDeployed.get() && !isMessageAcknowledged.get()){
             try {
                 String message = FCSMain.landingGearExchangeName + ":Landing Gear Deployed";
                 outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, message.getBytes());
@@ -65,11 +65,11 @@ class LandingGearInput implements Runnable {
                 if (message.equals("Deploy Landing Gear")) {
                     System.out.println("\u001B[38;2;255;192;203m" + "LandingGear deployed" + "\u001B[0m");
                     String landingGearMessage = "LG:Landing Gear deployed";
-                    landingGear.isLandingGearDeployed = true;
+                    landingGear.isLandingGearDeployed.set(true);
                     landingGear.outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, landingGearMessage.getBytes("UTF-8"));
                     System.out.println("\u001B[38;2;255;192;203m" + "Landing Gear sent: " + landingGearMessage + " to flight control" + "\u001B[0m");
                 } else if (message.equals("Message Acknowledged")) {
-                    landingGear.isMessageAcknowledged = true;
+                    landingGear.isMessageAcknowledged.set(true);
                     System.out.println("\u001B[38;2;255;192;203m" + "LandingGear message acknowledged, Stop sending messages" + "\u001B[0m");
                 }
             }, consumerTag -> {

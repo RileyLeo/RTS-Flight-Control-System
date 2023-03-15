@@ -7,12 +7,13 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Engine implements Runnable{
     Channel inputChannel;
     Channel outputChannel;
     String queueName;
-    public static boolean isAfterTurbulence = false;
+    public static AtomicBoolean isAfterTurbulence = new AtomicBoolean(false);
     public Engine(Connection connection) throws IOException {
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.engineExchangeName, "fanout");
@@ -29,7 +30,7 @@ public class Engine implements Runnable{
         try {
             inputChannel.basicConsume(queueName, true,  (consumerTag, delivery) -> {
                 String message = new String(delivery.getBody(), "UTF-8");
-                boolean alreadyAdjusted = false;
+                AtomicBoolean alreadyAdjusted = new AtomicBoolean(false);
                 System.out.println("\u001B[35m" + "Engine received - " + message + "\u001B[0m");
                 String[] parts = message.split("-");
                 long sendTime;
@@ -43,7 +44,7 @@ public class Engine implements Runnable{
                         System.out.println("\u001B[35m" + "Engine sent: " + engineMessage + "\u001B[0m");
                     } else {
                         System.out.println("\u001B[35m" + "Engine already in decelerate mode" + "\u001B[0m");
-                        alreadyAdjusted = true;
+                        alreadyAdjusted.set(true);
                     }
                 } else if (parts[0].equals("Accelerate")) {
                     if (!currentEngineState.equals("Accelerate")) {
@@ -54,7 +55,7 @@ public class Engine implements Runnable{
                         System.out.println("\u001B[35m" + "Engine sent: " + engineMessage + "\u001B[0m");
                     } else {
                         System.out.println("\u001B[35m" + "Engine already in accelerate mode" + "\u001B[0m");
-                        alreadyAdjusted = true;
+                        alreadyAdjusted.set(true);
                     }
                 } else if (parts[0].equals("Moderate")) {
                     if (!currentEngineState.equals("Moderate")) {
@@ -65,17 +66,17 @@ public class Engine implements Runnable{
                         System.out.println("\u001B[35m" + "Engine sent: " + engineMessage + "\u001B[0m");
                     } else {
                         System.out.println("\u001B[35m" + "Engine already in maintain mode" + "\u001B[0m");
-                        alreadyAdjusted = true;
+                        alreadyAdjusted.set(true);
                     }
                 }
-                if (alreadyAdjusted == false && isAfterTurbulence == false){
+                if (alreadyAdjusted.get() == false && isAfterTurbulence.get() == false){
                     long currentTime = System.nanoTime();
                     System.out.println("\u001B[32m" + "Wing Flaps current time: " + currentTime + "\u001B[0m");
                     long totalTime = currentTime - sendTime;
                     System.out.println("\u001B[32m" + "Wing Flaps Latency: " + totalTime + "\u001B[0m");
                     LatencyTester.timeList.add((double) (totalTime)/1000000);
                 }
-                isAfterTurbulence = false;
+                isAfterTurbulence.set(false);
             }, consumerTag -> {});
         } catch (IOException e) {
             throw new RuntimeException(e);

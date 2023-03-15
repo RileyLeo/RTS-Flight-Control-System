@@ -29,7 +29,7 @@ public class FlightControl implements Runnable {
     }
 
     //Dependencies variables
-    boolean isMasksDeployed = false;
+    AtomicBoolean isMasksDeployed = new AtomicBoolean(false);
     int upperboundAltitudeDuringFlight = 38000;
     int middleboundAltitudeDuringFlight = 34500;
     int lowerboundAltitudeDuringFlight = 31000;
@@ -41,8 +41,7 @@ public class FlightControl implements Runnable {
     int middleboundSpeedThreshold = 50; //900 +- 50 = (850 to 950)
     String engineMode = "Moderate";
     String currentWeather;
-    public static boolean turbulanceCountermeasures = false;
-
+    public static AtomicBoolean  turbulanceCountermeasures = new AtomicBoolean(false);
 
     @Override
     public void run() {
@@ -65,7 +64,7 @@ public class FlightControl implements Runnable {
                             String[] parts = message.split(":");
                             String time = (parts[1].split("-"))[1];
                             int cabinPressure = Integer.parseInt((parts[1].split("-"))[0]);
-                            if (cabinPressure < 80 && !isMasksDeployed) {
+                            if (cabinPressure < 80 && !isMasksDeployed.get()) {
                                 System.out.println("Cabin pressure is low, deploying masks");
                                 // deploy oxygen mask
                                 // send a message to oxygen mask to come down
@@ -73,7 +72,7 @@ public class FlightControl implements Runnable {
                                 String oxygenMaskMessage = "Deploy Masks" + "-" + time;
                                 outputChannel.basicPublish(FCSMain.oxygenMaskExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
                                 System.out.println("Flight Control sent: " + oxygenMaskMessage);
-                            } else if (cabinPressure > 90 && isMasksDeployed) {
+                            } else if (cabinPressure > 90 && isMasksDeployed.get()) {
                                 System.out.println("Cabin pressure is high, retracting masks");
                                 // retract oxygen mask
                                 // send a message to oxygen mask to retract
@@ -87,10 +86,10 @@ public class FlightControl implements Runnable {
                             String[] parts = message.split(":");
                             String oxygenMaskStatus = parts[1];
                             if (oxygenMaskStatus.equals("Deployed")) {
-                                isMasksDeployed = true;
+                                isMasksDeployed.set(true);
                                 System.out.println("Oxygen masks deployed successfully");
                             } else if (oxygenMaskStatus.equals("Retracted")) {
-                                isMasksDeployed = false;
+                                isMasksDeployed.set(false);
                                 System.out.println("Oxygen masks retracted successfully");
                             }
                         } else if (message.contains("AL")) {
@@ -99,7 +98,7 @@ public class FlightControl implements Runnable {
                             String time = (parts[1].split("-"))[1];
                             int altitude = Integer.parseInt((parts[1].split("-"))[0]);
 //                            System.out.println(time + " - " + altitude);
-                            if (turbulanceCountermeasures == false) {
+                            if (turbulanceCountermeasures.get() == false) {
                                 if (altitude > upperboundAltitudeDuringFlight && !flapPosition.equals("low")) {
                                     System.out.println("Altitude is high, adjusting wing flaps to a lower angle");
                                     // adjust wing flaps to a lower angle
@@ -147,7 +146,7 @@ public class FlightControl implements Runnable {
                             String[] parts = message.split(":");
                             String time = (parts[1].split("-"))[1];
                             int speed = Integer.parseInt((parts[1].split("-"))[0]);
-                            if (turbulanceCountermeasures == false) {
+                            if (turbulanceCountermeasures.get() == false) {
                                 if (speed > upperboundSpeedDuringFlight && !engineMode.equals("Decelerated")) {
                                     System.out.println("Speed is high, decelerate engine to slow down");
                                     // decelerate engine to slow down
@@ -205,7 +204,7 @@ public class FlightControl implements Runnable {
                                 currentWeather = "Thunderstorm";
                                 System.out.println("Activating turbulence countermeasures");
                                 // activate turbulence countermeasures
-                                turbulanceCountermeasures = true;
+                                turbulanceCountermeasures.set(true);
                                 turbulenceSequence(time);
                             }
                         }
@@ -222,7 +221,7 @@ public class FlightControl implements Runnable {
     public static volatile boolean isLandingGearDeployed = false;
     public static volatile boolean isSpeedZero = false;
     public static volatile boolean isAltitudeZero = false;
-    volatile boolean  landingMessageSent = false;
+    volatile boolean landingMessageSent = false;
 
     public void landingSequence() {
         try {
@@ -346,10 +345,10 @@ public class FlightControl implements Runnable {
             // send a message to Weather Environment sensor to inform
             outputChannel.exchangeDeclare(FCSMain.weatherEnvironmentExchangeName, "fanout");
             String weatherMessage = "Turbulence resolved";
-            WingFlaps.isAfterTurbulence = true;
-            Engine.isAfterTurbulence = true;
-            OxygenMasks.isAfterTurbulence = true;
-            turbulanceCountermeasures = false;
+            WingFlaps.isAfterTurbulence.set(true);
+            Engine.isAfterTurbulence.set(true);
+            OxygenMasks.isAfterTurbulence.set(true);
+            turbulanceCountermeasures.set(false);
             outputChannel.basicPublish(FCSMain.weatherEnvironmentExchangeName, "", null, weatherMessage.getBytes("UTF-8"));
 
         } catch (UnsupportedEncodingException e) {

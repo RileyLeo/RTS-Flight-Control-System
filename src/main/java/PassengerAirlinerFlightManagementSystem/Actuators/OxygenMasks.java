@@ -15,8 +15,8 @@ public class OxygenMasks implements Runnable {
     Channel inputChannel;
     Channel outputChannel;
     String queueName;
-    boolean isMaskDropped = false;
-    public static boolean isAfterTurbulence = false;
+    AtomicBoolean isMaskDropped = new AtomicBoolean(false);
+    public static AtomicBoolean isAfterTurbulence = new AtomicBoolean(false);
     public OxygenMasks(Connection connection) throws IOException {
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.oxygenMaskExchangeName, "fanout");
@@ -33,25 +33,25 @@ public class OxygenMasks implements Runnable {
 //            System.out.println("\u001B[36m" + "Oxygen Masks:" + "\u001B[0m" + " Oxygen Masks is waiting for flight control message");
             inputChannel.basicConsume(queueName, true,  (consumerTag, delivery) -> {
                 String message = new String(delivery.getBody(), "UTF-8");
-                boolean alreadyAdjusted = false;
+                AtomicBoolean alreadyAdjusted = new AtomicBoolean(false);
                 System.out.println("\u001B[36m" + "Oxygen Masks received - " + message + "\u001B[0m");
                 String[] parts = message.split("-");
                 long sendTime;
                 sendTime = Long.parseLong(parts[1]);
                 if (parts[0].equals("Deploy Masks")) {
-                    if (!isMaskDropped) {
+                    if (!isMaskDropped.get()) {
                         System.out.println("\u001B[36m" +"Oxygen Masks deployed" + "\u001B[0m");
                         String oxygenMaskMessage = "OM:Deployed";
                         outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
                         System.out.println("\u001B[36m" + "Oxygen Masks sent: " + oxygenMaskMessage +"\u001B[0m");
-                        isMaskDropped = true;
+                        isMaskDropped.set(true);
                     } else{
                         System.out.println("\u001B[36m" + "Oxygen Masks are already deployed" + "\u001B[0m");
                     }
                 } else if (parts[0].equals("Retract Masks")) {
-                    if (isMaskDropped) {
+                    if (isMaskDropped.get()) {
                         System.out.println("\u001B[36m" + "Oxygen Masks have been retracted" + "\u001B[0m");
-                        isMaskDropped = false;
+                        isMaskDropped.set(false);
                         String oxygenMaskMessage = "OM:Retracted";
                         outputChannel.basicPublish(FCSMain.flightControlExchangeName, "", null, oxygenMaskMessage.getBytes("UTF-8"));
                         System.out.println("\u001B[36m" + "Oxygen Masks sent: " + oxygenMaskMessage + "\u001B[0m");
@@ -59,14 +59,14 @@ public class OxygenMasks implements Runnable {
                     } else{
                         System.out.println("\u001B[36m" + "Oxygen Masks are already retracted" + "\u001B[0m");
                     }
-                    if (alreadyAdjusted == false && isAfterTurbulence == false){
+                    if (alreadyAdjusted.get() == false && isAfterTurbulence.get() == false){
                         long currentTime = System.nanoTime();
                         System.out.println("\u001B[32m" + "Wing Flaps current time: " + currentTime + "\u001B[0m");
                         long totalTime = currentTime - sendTime;
                         System.out.println("\u001B[32m" + "Wing Flaps Latency: " + totalTime + "\u001B[0m");
                         LatencyTester.timeList.add((double) (totalTime)/1000000);
                     }
-                    isAfterTurbulence = false;
+                    isAfterTurbulence.set(false);
                 }
             }, consumerTag -> {});
         } catch (IOException e) {

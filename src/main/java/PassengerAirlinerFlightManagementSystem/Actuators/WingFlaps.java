@@ -6,6 +6,7 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class WingFlaps implements Runnable{
 
@@ -13,7 +14,8 @@ public class WingFlaps implements Runnable{
     Channel outputChannel;
     String queueName;
     String flapPosition = "neutral";
-    public static boolean isAfterTurbulence = false;
+    public static AtomicBoolean isAfterTurbulence = new AtomicBoolean(false);
+
     public WingFlaps(Connection connection) throws IOException {
         inputChannel = connection.createChannel();
         inputChannel.exchangeDeclare(FCSMain.wingFlapsExchangeName, "fanout");
@@ -30,7 +32,7 @@ public class WingFlaps implements Runnable{
         try {
             inputChannel.basicConsume(queueName, true,  (consumerTag, delivery) -> {
                 String message = new String(delivery.getBody(), "UTF-8");
-                boolean alreadyAdjusted = false;
+                AtomicBoolean alreadyAdjusted = new AtomicBoolean(false);
                 System.out.println("\u001B[32m" + "Wing Flaps received - " + message + "\u001B[0m");
                 String[] parts = message.split("-");
                 long sendTime;
@@ -46,7 +48,7 @@ public class WingFlaps implements Runnable{
                         System.out.println("\u001B[32m" + "Wing Flaps sent: " + wingFlapsMessage + "\u001B[0m");
                     }else{
                         System.out.println("\u001B[32m" + "Wing Flaps are already lowered" + "\u001B[0m");
-                         alreadyAdjusted = true;
+                         alreadyAdjusted.set(true);
                     }
                 } else if (parts[0].equals("Adjust:Higher")) {
                     if (flapPosition != "high") {
@@ -57,7 +59,7 @@ public class WingFlaps implements Runnable{
                         System.out.println("\u001B[32m" + "Wing Flaps sent: " + wingFlapsMessage + "\u001B[0m");
                     }else{
                         System.out.println("\u001B[32m" + "Wing Flaps are already raised" + "\u001B[0m");
-                        alreadyAdjusted = true;
+                        alreadyAdjusted.set(true);
                     }
                 } else if (parts[0].equals("Adjust:Normal")) {
                     if (flapPosition != "neutral") {
@@ -68,17 +70,17 @@ public class WingFlaps implements Runnable{
                         System.out.println("\u001B[32m" + "Wing Flaps sent: " + wingFlapsMessage + "\u001B[0m");
                     }else{
                         System.out.println("\u001B[32m" + "Wing Flaps are already at neutral position" + "\u001B[0m");
-                        alreadyAdjusted = true;
+                        alreadyAdjusted.set(true);
                     }
                 }
-                if (alreadyAdjusted == false && isAfterTurbulence == false){
+                if (alreadyAdjusted.get() == false && isAfterTurbulence.get() == false){
                     long currentTime = System.nanoTime();
                     System.out.println("\u001B[32m" + "Wing Flaps current time: " + currentTime + "\u001B[0m");
                     long totalTime = currentTime - sendTime;
                     System.out.println("\u001B[32m" + "Wing Flaps Latency: " + totalTime + "\u001B[0m");
                     LatencyTester.timeList.add((double) (totalTime)/ 1000000);
                 }
-                isAfterTurbulence = false;
+                isAfterTurbulence.set(false);
             }, consumerTag -> {});
         } catch (IOException e) {
             throw new RuntimeException(e);

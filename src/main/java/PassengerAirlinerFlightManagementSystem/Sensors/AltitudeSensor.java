@@ -10,6 +10,7 @@ import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AltitudeSensor implements Runnable {
 
@@ -29,14 +30,13 @@ public class AltitudeSensor implements Runnable {
     Random rand = new Random();
     Integer CurrentAltitude = 34500;
     Integer flapModifier = 0;
-    boolean landingMode = false;
-//    boolean isAltitudeZero = false;
-    boolean isMessageAcknowledged = false;
-    boolean firstRun = true;
+    AtomicBoolean landingMode = new AtomicBoolean(false);
+    AtomicBoolean isMessageAcknowledged = new AtomicBoolean(false);
+    AtomicBoolean firstRun = new AtomicBoolean(true);
 
     @Override
     public void run() {
-        if (firstRun){
+        if (firstRun.get()){
             AltitudeSensorInput altitudeSensorInput = new AltitudeSensorInput(this);
             Thread thread = new Thread(altitudeSensorInput);
             thread.start();
@@ -44,7 +44,7 @@ public class AltitudeSensor implements Runnable {
 
         // adjust the altitude randomly
         int change = rand.nextInt(5);
-        if (landingMode == false) {
+        if (landingMode.get() == false) {
             if (rand.nextBoolean()) {
                 change *= -1;
             }
@@ -62,7 +62,7 @@ public class AltitudeSensor implements Runnable {
 
         // send the altitude to the flight control system
         try {
-            if (!isMessageAcknowledged && FlightControl.turbulanceCountermeasures == false) {
+            if (!isMessageAcknowledged.get() && FlightControl.turbulanceCountermeasures.get() == false) {
                 //get time in nanoseconds
                 long time = System.nanoTime();
                 String message = FCSMain.altitudeExchangeName + ":" + CurrentAltitude.toString() + "-" + time;
@@ -104,10 +104,10 @@ class AltitudeSensorInput implements Runnable {
                     altitudeSensor.flapModifier = 0;
                 } else if (message.equals("Landing mode activate, Wing flaps adjusted lower")) {
                     System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + "Landing mode activate, Wing flaps adjusted lower successfully");
-                    altitudeSensor.landingMode = true;
+                    altitudeSensor.landingMode.set(true);
                     altitudeSensor.flapModifier = -2;
                 }else if (message.equals("Message Acknowledged")) {
-                    altitudeSensor.isMessageAcknowledged = true;
+                    altitudeSensor.isMessageAcknowledged.set(true);
                     System.out.println("\u001B[33m" + "Altitude Sensor:"+ "\u001B[0m" + "Message acknowledged, sending stopped");
                 }
             }, consumerTag -> {
