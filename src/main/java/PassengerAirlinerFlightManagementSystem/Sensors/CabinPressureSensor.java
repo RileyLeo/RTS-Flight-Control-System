@@ -19,7 +19,6 @@ public class CabinPressureSensor implements Runnable {
     Channel outputChannel;
     String queueName;
     Random rand = new Random();
-    AtomicBoolean isDropping = new AtomicBoolean(true);
     ScheduledExecutorService timer;
 
     public CabinPressureSensor(Connection connection) throws IOException {
@@ -37,6 +36,7 @@ public class CabinPressureSensor implements Runnable {
 
 
     public Integer CabinPressurePercentage = 100;
+    AtomicBoolean isDropping = new AtomicBoolean(true);
     AtomicBoolean isLanding = new AtomicBoolean(false);
     AtomicBoolean oneMore = new AtomicBoolean(true);
     AtomicBoolean firstRun = new AtomicBoolean(true);
